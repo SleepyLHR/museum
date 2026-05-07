@@ -15,7 +15,7 @@ var AudioManager = (function () {
       console.warn('Web Audio API not supported');
     }
     
-    bgmAudio = new Audio('music/民谣综艺-童趣萌宠-彩虹糖_爱给网_aigei_com.mp3');
+    bgmAudio = new Audio('music/bgm.mp3');
     bgmAudio.loop = true;
     bgmAudio.volume = bgmVolume;
   }
