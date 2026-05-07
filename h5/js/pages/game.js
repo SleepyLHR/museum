@@ -265,7 +265,7 @@ var GamePage = (function () {
       + '<div class="relic-era">' + relic.era + '</div>'
       + '<div class="relic-location">' + relic.location + '</div>'
       + '<div class="relic-spec">规格：' + (relic.spec || '') + '</div>'
-      + '<div class="relic-value">' + relic.value + '</div>'
+      + (relic.value ? '<div class="relic-value">' + relic.value + '</div>' : '')
       + '<div class="relic-description">' + relic.description + '</div>'
       + '</div>'
       + '<div class="completion-buttons">'

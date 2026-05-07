@@ -5,11 +5,11 @@ var HomePage = (function () {
 
   function render() {
     var levels = [
-      { id: 'level1', num: 1, name: '行书轴' },
-      { id: 'level2', num: 2, name: '俑' },
-      { id: 'level3', num: 3, name: '风俗画' },
-      { id: 'level4', num: 4, name: '神龛' },
-      { id: 'level5', num: 5, name: '拔步床' }
+      { id: 'level1', num: 1 },
+      { id: 'level2', num: 2 },
+      { id: 'level3', num: 3 },
+      { id: 'level4', num: 4 },
+      { id: 'level5', num: 5 }
     ];
 
     var completed = App.state.completedLevels.length;
@@ -28,7 +28,6 @@ var HomePage = (function () {
 
       levelHtml += '<div class="' + cls + '" data-level="' + lv.id + '">';
       levelHtml += '<div class="level-number">' + lv.num + '</div>';
-      levelHtml += '<div class="level-name">' + lv.name + '</div>';
       if (App.isLevelCompleted(lv.id)) {
         levelHtml += '<div class="completed-badge">&#10003;</div>';
       }
@@ -44,8 +43,7 @@ var HomePage = (function () {
         + '<div class="preview-image"><img src="' + currentRelic.image + '" alt="' + currentRelic.name + '"></div>'
         + '<div class="preview-info">'
         + '<span class="info-item">' + currentRelic.era + '</span>'
-        + '<span class="info-item spec-info">规格：' + (currentRelic.spec || '') + '</span>'
-        + '<span class="info-item">' + currentRelic.location + '</span>'
+        + '<span class="info-item">' + '重庆巴渝民俗博物馆馆藏' + '</span>'
         + '</div>'
         + '</div>'
         + '</div>';
@@ -164,10 +162,9 @@ var HomePage = (function () {
     
     if (previewInfo && currentRelic) {
       var infoItems = previewInfo.querySelectorAll('.info-item');
-      if (infoItems.length >= 3) {
+      if (infoItems.length >= 2) {
         infoItems[0].textContent = currentRelic.era;
-        infoItems[1].textContent = '规格：' + (currentRelic.spec || '');
-        infoItems[2].textContent = currentRelic.location;
+        infoItems[1].textContent = '重庆巴渝民俗博物馆馆藏';
       }
     }
   }

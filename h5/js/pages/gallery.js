@@ -65,7 +65,7 @@ var GalleryPage = (function () {
       + '<div class="modal-era">' + relic.era + '</div>'
       + '<div class="modal-location">' + relic.location + '</div>'
       + '<div class="modal-spec">规格：' + (relic.spec || '') + '</div>'
-      + '<div class="modal-value">' + relic.value + '</div>'
+      + (relic.value ? '<div class="modal-value">' + relic.value + '</div>' : '')
       + '<div class="modal-description">' + relic.description + '</div>'
       + '</div>'
       + '</div>';
