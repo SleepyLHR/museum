@@ -6,7 +6,6 @@ var SettingsPage = (function () {
 
     var musicChecked = getSetting('musicEnabled', true) ? 'checked' : '';
     var soundChecked = getSetting('soundEnabled', true) ? 'checked' : '';
-    var vibrationChecked = getSetting('vibrationEnabled', true) ? 'checked' : '';
 
     return '<div class="settings-container">'
       + '<div class="settings-header">'
@@ -26,7 +25,6 @@ var SettingsPage = (function () {
       + '<div class="settings-card">'
       + buildSwitchItem('🎵', '音乐', 'setting-music', musicChecked)
       + buildSwitchItem('🔊', '音效', 'setting-sound', soundChecked)
-      + buildSwitchItem('📳', '振动', 'setting-vibration', vibrationChecked)
       + '</div>'
       + '<div class="settings-card">'
       + '<div class="action-section">'
@@ -76,8 +74,7 @@ var SettingsPage = (function () {
     try {
       localStorage.setItem('gameSettings', JSON.stringify({
         musicEnabled: document.getElementById('setting-music').checked,
-        soundEnabled: document.getElementById('setting-sound').checked,
-        vibrationEnabled: document.getElementById('setting-vibration').checked
+        soundEnabled: document.getElementById('setting-sound').checked
       }));
     } catch (e) {
       console.error('保存设置失败', e);
@@ -86,21 +83,36 @@ var SettingsPage = (function () {
 
   function mount() {
     document.getElementById('btn-back').addEventListener('click', function () {
+      AudioManager.playClick();
       Router.goBack();
     });
 
     document.getElementById('btn-home').addEventListener('click', function () {
+      AudioManager.playClick();
       Router.navigate('home');
     });
 
-    var switches = ['setting-music', 'setting-sound', 'setting-vibration'];
+    var switches = ['setting-music', 'setting-sound'];
     for (var i = 0; i < switches.length; i++) {
-      document.getElementById(switches[i]).addEventListener('change', function () {
+      document.getElementById(switches[i]).addEventListener('change', function (e) {
         saveSettings();
+        
+        var settingId = e.target.id;
+        
+        if (settingId === 'setting-music') {
+          var musicEnabled = document.getElementById('setting-music').checked;
+          AudioManager.setBgmEnabled(musicEnabled);
+        }
+        
+        if (settingId === 'setting-sound') {
+          var soundEnabled = document.getElementById('setting-sound').checked;
+          AudioManager.setSfxEnabled(soundEnabled);
+        }
       });
     }
 
     document.getElementById('btn-restart').addEventListener('click', function () {
+      AudioManager.playClick();
       Modal.confirm('确认重新开始', '重新开始将清除所有游戏进度，确定要继续吗？', function (confirmed) {
         if (confirmed) {
           App.resetProgress();

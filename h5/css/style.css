@@ -288,18 +288,18 @@ body {
 }
 
 .level-item {
-  width: 75px;
-  height: 90px;
+  width: 72px;
+  height: 82px;
   background: rgba(255, 255, 255, 0.95);
-  border-radius: 10px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   position: relative;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   cursor: pointer;
-  transition: transform 0.2s;
+  transition: all 0.2s;
 }
 
 .level-item:active {
@@ -322,13 +322,15 @@ body {
 .level-number {
   font-size: 24px;
   font-weight: bold;
-  color: #333;
+  color: #2c3e50;
 }
 
 .level-name {
   font-size: 11px;
-  color: #666;
-  margin-top: 4px;
+  color: #5a6c7d;
+  margin-top: 6px;
+  line-height: 1.3;
+  text-align: center;
 }
 
 .completed-badge {
@@ -376,17 +378,21 @@ body {
 
 .preview-image {
   width: 100%;
-  height: 150px;
+  height: auto;
   border-radius: 8px;
   overflow: hidden;
   margin-bottom: 10px;
   background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .preview-image img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  max-height: 250px;
+  object-fit: contain;
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
@@ -402,10 +408,17 @@ body {
 
 .preview-info {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-around;
+  gap: 5px;
 }
 
 .info-item {
+  font-size: 13px;
+  color: #666;
+}
+
+.spec-info {
   font-size: 13px;
   color: #666;
 }
@@ -532,62 +545,89 @@ body {
 
 .completion-content {
   width: 90%;
-  max-width: 340px;
-  background: #fff;
-  border-radius: 12px;
-  padding: 20px;
+  max-width: 360px;
+  background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%);
+  border-radius: 16px;
+  padding: 24px;
   text-align: center;
-  max-height: 85vh;
-  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
 }
 
 .celebration {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: bold;
   color: #2ecc71;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .completion-image {
   width: 100%;
-  height: 150px;
-  border-radius: 8px;
+  height: 180px;
+  border-radius: 12px;
   overflow: hidden;
-  margin-bottom: 15px;
-  background: #f0f0f0;
+  margin-bottom: 20px;
+  background: linear-gradient(145deg, #f5f5f5 0%, #e8e8e8 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
 .completion-image img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  padding: 10px;
 }
 
 .relic-details {
   text-align: left;
-  margin-bottom: 15px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: rgba(46, 204, 113, 0.05);
+  border-radius: 10px;
+  border-left: 4px solid #2ecc71;
 }
 
 .relic-name {
   font-size: 18px;
   font-weight: bold;
-  color: #333;
-  margin-bottom: 5px;
+  color: #2c3e50;
+  margin-bottom: 8px;
+  text-align: center;
 }
 
 .relic-era,
 .relic-location,
+.relic-spec,
 .relic-value {
   font-size: 14px;
-  color: #666;
-  margin-bottom: 4px;
+  color: #5a6c7d;
+  margin-bottom: 5px;
+  line-height: 1.5;
+}
+
+.relic-spec {
+  font-style: italic;
+  color: #7f8c8d;
+}
+
+.relic-value {
+  font-weight: 500;
+  color: #27ae60;
 }
 
 .relic-description {
   font-size: 13px;
-  color: #888;
-  line-height: 1.6;
-  margin-top: 10px;
+  color: #6b7c93;
+  line-height: 1.7;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(46, 204, 113, 0.2);
 }
 
 .completion-buttons {
@@ -715,21 +755,28 @@ body {
 }
 
 .relic-card.locked {
-  opacity: 0.6;
+  filter: blur(3px);
+  -webkit-filter: blur(3px);
+  opacity: 0.7;
 }
 
 .card-image {
   width: 100%;
-  height: 120px;
+  height: auto;
+  max-height: 150px;
   position: relative;
   overflow: hidden;
   background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .card-image img {
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
+  max-height: 150px;
+  object-fit: contain;
 }
 
 .locked-overlay {
@@ -752,6 +799,22 @@ body {
   color: #fff;
 }
 
+.locked-blur {
+  filter: blur(8px);
+  -webkit-filter: blur(8px);
+}
+
+.card-image.full-image {
+  width: 100%;
+  height: 100%;
+}
+
+.card-image.full-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .card-info {
   padding: 8px 10px;
 }
@@ -766,6 +829,12 @@ body {
   font-size: 11px;
   color: #666;
   margin-top: 3px;
+}
+
+.card-spec {
+  font-size: 10px;
+  color: #666;
+  margin-top: 2px;
 }
 
 .relic-modal-overlay {
@@ -835,10 +904,15 @@ body {
 
 .modal-era,
 .modal-location,
+.modal-spec,
 .modal-value {
   font-size: 14px;
   color: #666;
   margin-bottom: 4px;
+}
+
+.modal-spec {
+  color: #666;
 }
 
 .modal-description {

@@ -19,6 +19,7 @@
     </div>
   </div>
 
+  <script src="js/audio.js"></script>
   <script src="js/app.js"></script>
   <script src="js/components.js"></script>
   <script src="js/router.js"></script>
@@ -28,6 +29,33 @@
   <script src="js/pages/settings.js"></script>
   <script>
     Router.init();
+    
+    // 用户第一次交互时自动播放背景音乐
+    var bgmStarted = false;
+    
+    function tryStartBgm() {
+      if (bgmStarted) return;
+      bgmStarted = true;
+      
+      var musicEnabled = localStorage.getItem('gameSettings');
+      var shouldPlay = true;
+      if (musicEnabled) {
+        try {
+          var settings = JSON.parse(musicEnabled);
+          if (settings.musicEnabled === false) {
+            shouldPlay = false;
+          }
+        } catch (e) {}
+      }
+      if (shouldPlay) {
+        AudioManager.startBgm();
+      }
+    }
+    
+    // 监听用户交互事件
+    document.addEventListener('click', tryStartBgm, { once: true });
+    document.addEventListener('touchstart', tryStartBgm, { once: true });
+    document.addEventListener('keydown', tryStartBgm, { once: true });
   </script>
 </body>
 </html>

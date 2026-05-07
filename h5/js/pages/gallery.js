@@ -11,18 +11,12 @@ var GalleryPage = (function () {
       var cls = 'relic-card';
       if (!unlocked) cls += ' locked';
 
-      var imgHtml = '';
-      if (unlocked) {
-        imgHtml = '<img src="' + item.image + '" alt="' + item.name + '">';
-      } else {
-        imgHtml = '<div class="locked-overlay"><span class="locked-icon">🔒</span><span class="locked-text">未解锁</span></div>';
-      }
-
       cardsHtml += '<div class="' + cls + '" data-relic-index="' + i + '">'
-        + '<div class="card-image">' + imgHtml + '</div>'
+        + '<div class="card-image"><img src="' + item.image + '" alt="' + item.name + '"></div>'
         + '<div class="card-info">'
         + '<div class="card-name">' + item.name + '</div>'
         + '<div class="card-era">' + item.era + '</div>'
+        + '<div class="card-spec">规格：' + (item.spec || '') + '</div>'
         + '</div>'
         + '</div>';
     }
@@ -38,6 +32,7 @@ var GalleryPage = (function () {
 
   function mount() {
     document.getElementById('btn-back').addEventListener('click', function () {
+      AudioManager.playClick();
       Router.goBack();
     });
 
@@ -48,8 +43,10 @@ var GalleryPage = (function () {
         var relic = App.state.relics[idx];
         if (!App.isLevelCompleted(relic.level)) {
           Toast.show('完成关卡后解锁');
+          AudioManager.playError();
           return;
         }
+        AudioManager.playClick();
         showRelicModal(relic);
       });
     }
@@ -67,6 +64,7 @@ var GalleryPage = (function () {
       + '<div class="modal-name">' + relic.name + '</div>'
       + '<div class="modal-era">' + relic.era + '</div>'
       + '<div class="modal-location">' + relic.location + '</div>'
+      + '<div class="modal-spec">规格：' + (relic.spec || '') + '</div>'
       + '<div class="modal-value">' + relic.value + '</div>'
       + '<div class="modal-description">' + relic.description + '</div>'
       + '</div>'

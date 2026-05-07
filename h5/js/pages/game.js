@@ -147,19 +147,23 @@ var GamePage = (function () {
     if (!selectedPiece) {
       selectedPiece = pieceId;
       updateSelection();
+      AudioManager.playClick();
     } else if (selectedPiece === pieceId) {
       selectedPiece = null;
       updateSelection();
+      AudioManager.playClick();
     } else {
       swapPieces(selectedPiece, pieceId);
       selectedPiece = null;
       rebuildPuzzleGrid();
+      AudioManager.playMove();
 
       console.log('Checking completion...');
       var isComplete = checkCompletion();
       console.log('Completion check result:', isComplete);
       if (isComplete) {
         console.log('Calling onCompletion...');
+        AudioManager.playComplete();
         onCompletion();
       }
     }
@@ -230,7 +234,11 @@ var GamePage = (function () {
     App.completeLevel(currentLevel);
 
     setTimeout(function () {
-      showCompletionModal();
+      if (currentLevelNum >= totalLevels) {
+        showCertificateModal();
+      } else {
+        showCompletionModal();
+      }
     }, 500);
   }
 
@@ -256,6 +264,7 @@ var GamePage = (function () {
       + '<div class="relic-name">' + relic.name + '</div>'
       + '<div class="relic-era">' + relic.era + '</div>'
       + '<div class="relic-location">' + relic.location + '</div>'
+      + '<div class="relic-spec">规格：' + (relic.spec || '') + '</div>'
       + '<div class="relic-value">' + relic.value + '</div>'
       + '<div class="relic-description">' + relic.description + '</div>'
       + '</div>'

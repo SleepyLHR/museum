@@ -5,11 +5,11 @@ var HomePage = (function () {
 
   function render() {
     var levels = [
-      { id: 'level1', num: 1, name: '青铜鼎' },
-      { id: 'level2', num: 2, name: '玉琮' },
-      { id: 'level3', num: 3, name: '唐三彩' },
-      { id: 'level4', num: 4, name: '青花瓷' },
-      { id: 'level5', num: 5, name: '景泰蓝' }
+      { id: 'level1', num: 1, name: '行书轴' },
+      { id: 'level2', num: 2, name: '俑' },
+      { id: 'level3', num: 3, name: '风俗画' },
+      { id: 'level4', num: 4, name: '神龛' },
+      { id: 'level5', num: 5, name: '拔步床' }
     ];
 
     var completed = App.state.completedLevels.length;
@@ -44,6 +44,7 @@ var HomePage = (function () {
         + '<div class="preview-image"><img src="' + currentRelic.image + '" alt="' + currentRelic.name + '"></div>'
         + '<div class="preview-info">'
         + '<span class="info-item">' + currentRelic.era + '</span>'
+        + '<span class="info-item spec-info">规格：' + (currentRelic.spec || '') + '</span>'
         + '<span class="info-item">' + currentRelic.location + '</span>'
         + '</div>'
         + '</div>'
@@ -90,6 +91,7 @@ var HomePage = (function () {
 
   function mount() {
     document.getElementById('btn-settings').addEventListener('click', function () {
+      AudioManager.playClick();
       Router.navigate('settings');
     });
 
@@ -99,8 +101,10 @@ var HomePage = (function () {
         var id = this.getAttribute('data-level');
         if (!App.isLevelUnlocked(id)) {
           Toast.show('请先完成前面的关卡');
+          AudioManager.playError();
           return;
         }
+        AudioManager.playClick();
         selectedLevel = id;
         updateUI();
       });
@@ -109,23 +113,17 @@ var HomePage = (function () {
     document.getElementById('btn-start').addEventListener('click', function () {
       if (!selectedLevel) {
         Toast.show('请选择关卡');
+        AudioManager.playError();
         return;
       }
+      AudioManager.playClick();
       Router.navigate('game', { level: selectedLevel });
     });
 
     document.getElementById('btn-gallery').addEventListener('click', function () {
+      AudioManager.playClick();
       Router.navigate('gallery');
     });
-  }
-
-  function getCurrentRelic() {
-    for (var i = 0; i < App.state.relics.length; i++) {
-      if (App.state.relics[i].level === selectedLevel) {
-        return App.state.relics[i];
-      }
-    }
-    return App.state.relics[0];
   }
 
   function updateUI() {
@@ -166,9 +164,10 @@ var HomePage = (function () {
     
     if (previewInfo && currentRelic) {
       var infoItems = previewInfo.querySelectorAll('.info-item');
-      if (infoItems.length >= 2) {
+      if (infoItems.length >= 3) {
         infoItems[0].textContent = currentRelic.era;
-        infoItems[1].textContent = currentRelic.location;
+        infoItems[1].textContent = '规格：' + (currentRelic.spec || '');
+        infoItems[2].textContent = currentRelic.location;
       }
     }
   }
