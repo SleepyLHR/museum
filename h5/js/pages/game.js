@@ -234,14 +234,19 @@ var GamePage = (function () {
 
     setTimeout(function () {
       if (currentLevelNum >= totalLevels) {
-        showCertificateModal();
+        if (!App.hasFirstCompletion()) {
+          App.setFirstCompletion(App.getTotalTime(), App.getNickname());
+          showFirstCompletionModal();
+        } else {
+          showCompletionModal(true);
+        }
       } else {
-        showCompletionModal();
+        showCompletionModal(false);
       }
     }, 500);
   }
 
-  function showCompletionModal() {
+  function showCompletionModal(showCertBtn) {
     var overlay = document.createElement('div');
     overlay.className = 'completion-overlay';
     overlay.id = 'completion-overlay';
@@ -256,6 +261,19 @@ var GamePage = (function () {
     overlay.style.justifyContent = 'center';
     overlay.style.zIndex = '9999';
 
+    var buttonsHtml = '';
+    if (currentLevelNum >= totalLevels) {
+      if (showCertBtn) {
+        buttonsHtml = '<button class="btn-primary" id="btn-view-cert">🏆 查看证书</button>'
+          + '<button class="btn-secondary" id="btn-home">返回首页</button>';
+      } else {
+        buttonsHtml = '<button class="btn-secondary" id="btn-home">返回首页</button>';
+      }
+    } else {
+      buttonsHtml = '<button class="btn-primary" id="btn-continue">继续挑战</button>'
+        + '<button class="btn-secondary" id="btn-home">返回首页</button>';
+    }
+
     overlay.innerHTML = '<div class="completion-content">'
       + '<div class="celebration">🎉 恭喜完成！</div>'
       + '<div class="completion-image"><img src="' + relic.image + '" alt="' + relic.name + '" onerror="this.style.display=\'none\'"></div>'
@@ -268,8 +286,7 @@ var GamePage = (function () {
       + '<div class="relic-description">' + relic.description + '</div>'
       + '</div>'
       + '<div class="completion-buttons">'
-      + '<button class="btn-primary" id="btn-continue">继续挑战</button>'
-      + '<button class="btn-secondary" id="btn-home">返回首页</button>'
+      + buttonsHtml
       + '</div>'
       + '</div>';
 
@@ -281,46 +298,57 @@ var GamePage = (function () {
       }
     });
 
-    document.getElementById('btn-continue').addEventListener('click', function () {
-      overlay.remove();
-      var nextLevelNum = currentLevelNum + 1;
-      if (nextLevelNum <= totalLevels) {
-        Router.replace('game', { level: 'level' + nextLevelNum });
-      } else {
-        showCertificateModal();
+    if (currentLevelNum >= totalLevels) {
+      if (showCertBtn) {
+        document.getElementById('btn-view-cert').addEventListener('click', function () {
+          overlay.remove();
+          Router.navigate('certificate');
+        });
       }
-    });
+      document.getElementById('btn-home').addEventListener('click', function () {
+        overlay.remove();
+        Router.navigate('home');
+      });
+    } else {
+      document.getElementById('btn-continue').addEventListener('click', function () {
+        overlay.remove();
+        var nextLevelNum = currentLevelNum + 1;
+        if (nextLevelNum <= totalLevels) {
+          Router.replace('game', { level: 'level' + nextLevelNum });
+        }
+      });
 
-    document.getElementById('btn-home').addEventListener('click', function () {
-      overlay.remove();
-      Router.navigate('home');
-    });
+      document.getElementById('btn-home').addEventListener('click', function () {
+        overlay.remove();
+        Router.navigate('home');
+      });
+    }
   }
 
-  function showCertificateModal() {
+  function showFirstCompletionModal() {
     var now = new Date();
     var dateStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日';
-    var certNum = App.generateMedalNumber();
+    var certNum = App.getMedalNumber();
+    var nickname = App.getNickname();
+    var totalSeconds = App.getTotalTime();
+    var totalTimeStr = App.formatTime(totalSeconds);
 
     var overlay = document.createElement('div');
     overlay.className = 'completion-overlay';
     overlay.id = 'cert-overlay';
 
-    var nickname = App.getNickname();
-    var totalSeconds = App.getTotalTime();
-    var totalTimeStr = App.formatTime(totalSeconds);
-
-    overlay.innerHTML = '<div class="certificate-content">'
+    overlay.innerHTML = '<div class="certificate-content first-completion">'
+      + '<div class="celebration">🎉 恭喜首次通关！</div>'
       + '<div class="certificate-title">文物拼图大挑战</div>'
-      + '<div class="certificate-subtitle">电子荣誉证书</div>'
+      + '<div class="certificate-subtitle">电子荣誉证书 · 首次通关纪念</div>'
       + '<div class="certificate-name">' + nickname + '</div>'
       + '<div class="certificate-text">成功完成全部文物拼图挑战</div>'
       + '<div class="certificate-total-time">通关总耗时：' + totalTimeStr + '</div>'
       + '<div class="certificate-number">证书编号：' + certNum + '</div>'
       + '<div class="certificate-date">' + dateStr + '</div>'
       + '<div class="certificate-buttons">'
-      + '<button class="btn-primary" id="btn-save-cert">保存证书</button>'
-      + '<button class="btn-secondary" id="btn-close-cert">关闭</button>'
+      + '<button class="btn-primary" id="btn-view-cert">🏆 查看证书</button>'
+      + '<button class="btn-primary" id="btn-save-cert">📥 保存证书</button>'
       + '</div>'
       + '</div>';
 
@@ -329,20 +357,22 @@ var GamePage = (function () {
     overlay.addEventListener('click', function (e) {
       if (e.target === overlay) {
         overlay.remove();
+        Router.navigate('home');
       }
     });
 
-    document.getElementById('btn-save-cert').addEventListener('click', function () {
-      saveCertificateAsImage(nickname, totalTimeStr, certNum, dateStr);
+    document.getElementById('btn-view-cert').addEventListener('click', function () {
+      overlay.remove();
+      Router.navigate('certificate');
     });
 
-    document.getElementById('btn-close-cert').addEventListener('click', function () {
-      overlay.remove();
-      Router.navigate('home');
+    document.getElementById('btn-save-cert').addEventListener('click', function () {
+      saveCertificateAsImage(nickname, totalTimeStr, certNum, dateStr, '电子荣誉证书 · 首次通关纪念');
     });
   }
 
-  function saveCertificateAsImage(nickname, totalTimeStr, certNum, dateStr) {
+  function saveCertificateAsImage(nickname, totalTimeStr, certNum, dateStr, subtitle) {
+    subtitle = subtitle || '电子荣誉证书';
     var canvas = document.createElement('canvas');
     var w = 750;
     var h = 1050;
@@ -372,7 +402,7 @@ var GamePage = (function () {
 
     ctx.fillStyle = '#2ecc71';
     ctx.font = 'bold 36px "PingFang SC", "Microsoft YaHei", sans-serif';
-    ctx.fillText('电子荣誉证书', w / 2, 220);
+    ctx.fillText(subtitle, w / 2, 220);
 
     ctx.strokeStyle = '#ddd';
     ctx.lineWidth = 1;
@@ -459,6 +489,7 @@ var GamePage = (function () {
   return {
     render: render,
     mount: mount,
-    unmount: unmount
+    unmount: unmount,
+    saveCertificateAsImage: saveCertificateAsImage
   };
 })();

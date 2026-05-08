@@ -68,6 +68,7 @@ var Router = (function () {
       case 'game': handler = GamePage; break;
       case 'gallery': handler = GalleryPage; break;
       case 'settings': handler = SettingsPage; break;
+      case 'certificate': handler = CertificatePage; break;
       default:
         handler = HomePage;
         page = 'home';

@@ -10,11 +10,13 @@ var App = (function () {
 
   var levelTimes = {};
   var medalNumber = '';
+  var firstCompletion = null;
 
   function init() {
     loadUserData();
     loadLevelTimes();
     loadMedalNumber();
+    loadFirstCompletion();
     loadRelicsData();
   }
 
@@ -91,6 +93,35 @@ var App = (function () {
       localStorage.setItem('medalNumber', medalNumber);
     } catch (e) {}
     return medalNumber;
+  }
+
+  function loadFirstCompletion() {
+    try {
+      var data = localStorage.getItem('firstCompletion');
+      if (data) {
+        firstCompletion = JSON.parse(data);
+      }
+    } catch (e) {
+      firstCompletion = null;
+    }
+  }
+
+  function setFirstCompletion(time, nickname) {
+    var now = new Date();
+    var dateStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日';
+    firstCompletion = { time: time, date: dateStr, nickname: nickname };
+    try {
+      localStorage.setItem('firstCompletion', JSON.stringify(firstCompletion));
+    } catch (e) {}
+    generateMedalNumber();
+  }
+
+  function getFirstCompletion() {
+    return firstCompletion;
+  }
+
+  function hasFirstCompletion() {
+    return firstCompletion !== null && firstCompletion.time > 0;
   }
 
   function loadUserData() {
@@ -209,9 +240,11 @@ var App = (function () {
     state.unlockedLevels = ['level1'];
     levelTimes = {};
     medalNumber = '';
+    firstCompletion = null;
     localStorage.removeItem('userData');
     localStorage.removeItem('levelTimes');
     localStorage.removeItem('medalNumber');
+    localStorage.removeItem('firstCompletion');
   }
 
   function getNickname() {
@@ -238,6 +271,9 @@ var App = (function () {
     getTotalTime: getTotalTime,
     formatTime: formatTime,
     getMedalNumber: getMedalNumber,
-    generateMedalNumber: generateMedalNumber
+    generateMedalNumber: generateMedalNumber,
+    setFirstCompletion: setFirstCompletion,
+    getFirstCompletion: getFirstCompletion,
+    hasFirstCompletion: hasFirstCompletion
   };
 })();

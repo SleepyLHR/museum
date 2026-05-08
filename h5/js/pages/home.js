@@ -49,10 +49,23 @@ var HomePage = (function () {
         + '</div>';
     }
 
+    var hasCert = App.hasFirstCompletion();
+
+    var bottomButtonsHtml = '';
+    if (hasCert) {
+      bottomButtonsHtml = '<div class="bottom-nav-row">'
+        + '<button class="bottom-nav-btn" id="btn-gallery-new">🖼 图库</button>'
+        + '<button class="bottom-nav-btn cert-btn" id="btn-cert">🏆 证书</button>'
+        + '<button class="bottom-nav-btn" id="btn-settings-new">⚙ 设置</button>'
+        + '</div>';
+    } else {
+      bottomButtonsHtml = '<div class="bottom-nav-row">'
+        + '<button class="bottom-nav-btn" id="btn-gallery-new">🖼 图库</button>'
+        + '<button class="bottom-nav-btn" id="btn-settings-new">⚙ 设置</button>'
+        + '</div>';
+    }
+
     return '<div class="home-container">'
-      + '<div class="home-header">'
-      + '<div class="home-settings-btn" id="btn-settings">&#9881;</div>'
-      + '</div>'
       + '<div class="progress-section">'
       + '<div class="progress-title">关卡进度</div>'
       + '<div class="progress-bar-container"><div class="progress-bar" style="width:' + percent + '%"></div></div>'
@@ -62,7 +75,7 @@ var HomePage = (function () {
       + previewHtml
       + '<div class="action-buttons">'
       + '<button class="btn-primary start-btn" id="btn-start">开始游戏</button>'
-      + '<button class="btn-secondary gallery-btn" id="btn-gallery">图库</button>'
+      + bottomButtonsHtml
       + '</div>'
       + '<div class="footer">公益科普 · 文化传承</div>'
       + '</div>';
@@ -88,11 +101,6 @@ var HomePage = (function () {
   }
 
   function mount() {
-    document.getElementById('btn-settings').addEventListener('click', function () {
-      AudioManager.playClick();
-      Router.navigate('settings');
-    });
-
     var levelItems = document.querySelectorAll('.level-item');
     for (var i = 0; i < levelItems.length; i++) {
       levelItems[i].addEventListener('click', function () {
@@ -118,10 +126,29 @@ var HomePage = (function () {
       Router.navigate('game', { level: selectedLevel });
     });
 
-    document.getElementById('btn-gallery').addEventListener('click', function () {
-      AudioManager.playClick();
-      Router.navigate('gallery');
-    });
+    var galleryBtn = document.getElementById('btn-gallery-new');
+    if (galleryBtn) {
+      galleryBtn.addEventListener('click', function () {
+        AudioManager.playClick();
+        Router.navigate('gallery');
+      });
+    }
+
+    var certBtn = document.getElementById('btn-cert');
+    if (certBtn) {
+      certBtn.addEventListener('click', function () {
+        AudioManager.playClick();
+        Router.navigate('certificate');
+      });
+    }
+
+    var settingsBtn = document.getElementById('btn-settings-new');
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', function () {
+        AudioManager.playClick();
+        Router.navigate('settings');
+      });
+    }
   }
 
   function updateUI() {
