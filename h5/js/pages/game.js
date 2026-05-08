@@ -3,12 +3,11 @@ var GamePage = (function () {
 
   var currentLevel = 'level1';
   var currentLevelNum = 1;
-  var totalLevels = 5;
   var relic = {};
   var puzzlePieces = [];
   var selectedPiece = null;
   var gridCols = 3;
-  var gridRows = 2;
+  var gridRows = 3;
   var completed = false;
   var levelStartTime = 0;
 
@@ -21,16 +20,11 @@ var GamePage = (function () {
     levelStartTime = Date.now();
     completed = false;
 
-    var found = null;
-    for (var i = 0; i < App.state.relics.length; i++) {
-      if (App.state.relics[i].level === currentLevel) {
-        found = App.state.relics[i];
-        break;
-      }
-    }
-    relic = found || App.state.relics[0];
+    relic = App.getRelicByLevel(currentLevel);
 
-    calcGrid(relic.pieces);
+    gridCols = relic.gridCols || 3;
+    gridRows = relic.gridRows || 3;
+
     initPuzzle();
     completed = false;
     selectedPiece = null;
@@ -38,17 +32,8 @@ var GamePage = (function () {
     return buildHtml();
   }
 
-  function calcGrid(pieces) {
-    if (pieces === 6) { gridCols = 3; gridRows = 2; }
-    else if (pieces === 8) { gridCols = 4; gridRows = 2; }
-    else if (pieces === 10) { gridCols = 5; gridRows = 2; }
-    else if (pieces === 12) { gridCols = 4; gridRows = 3; }
-    else if (pieces === 15) { gridCols = 5; gridRows = 3; }
-    else { gridCols = 3; gridRows = 2; }
-  }
-
   function initPuzzle() {
-    var pieceCount = relic.pieces || 6;
+    var pieceCount = relic.pieces || 9;
     puzzlePieces = [];
     var idx = 0;
     for (var row = 0; row < gridRows; row++) {
@@ -116,6 +101,8 @@ var GamePage = (function () {
       cellsHtml += '<div class="' + cls + '" data-piece-id="' + piece.id + '" style="' + buildPieceStyle(piece) + '">'
         + '</div>';
     }
+
+    var totalLevels = App.getTotalLevels();
 
     return '<div class="game-container">'
       + '<div class="game-header">'
@@ -232,6 +219,8 @@ var GamePage = (function () {
     App.setLevelTime(currentLevel, elapsed);
     App.completeLevel(currentLevel);
 
+    var totalLevels = App.getTotalLevels();
+
     setTimeout(function () {
       if (currentLevelNum >= totalLevels) {
         if (!App.hasFirstCompletion()) {
@@ -247,6 +236,9 @@ var GamePage = (function () {
   }
 
   function showCompletionModal(showCertBtn) {
+    var settings = App.getSettings();
+    var totalLevels = App.getTotalLevels();
+
     var overlay = document.createElement('div');
     overlay.className = 'completion-overlay';
     overlay.id = 'completion-overlay';
@@ -280,9 +272,8 @@ var GamePage = (function () {
       + '<div class="relic-details">'
       + '<div class="relic-name">' + relic.name + '</div>'
       + '<div class="relic-era">' + relic.era + '</div>'
-      + '<div class="relic-location">' + relic.location + '</div>'
+      + '<div class="relic-location">' + settings.location + '</div>'
       + '<div class="relic-spec">规格：' + (relic.spec || '') + '</div>'
-      + (relic.value ? '<div class="relic-value">' + relic.value + '</div>' : '')
       + '<div class="relic-description">' + relic.description + '</div>'
       + '</div>'
       + '<div class="completion-buttons">'
@@ -313,8 +304,9 @@ var GamePage = (function () {
       document.getElementById('btn-continue').addEventListener('click', function () {
         overlay.remove();
         var nextLevelNum = currentLevelNum + 1;
+        var prefix = settings.levelPrefix || 'level';
         if (nextLevelNum <= totalLevels) {
-          Router.replace('game', { level: 'level' + nextLevelNum });
+          Router.replace('game', { level: prefix + nextLevelNum });
         }
       });
 
@@ -373,6 +365,7 @@ var GamePage = (function () {
 
   function saveCertificateAsImage(nickname, totalTimeStr, certNum, dateStr, subtitle) {
     subtitle = subtitle || '电子荣誉证书';
+    var settings = App.getSettings();
     var canvas = document.createElement('canvas');
     var w = 750;
     var h = 1050;
@@ -440,7 +433,7 @@ var GamePage = (function () {
 
     ctx.fillStyle = '#999';
     ctx.font = '20px "PingFang SC", "Microsoft YaHei", sans-serif';
-    ctx.fillText('巴渝民俗博物馆 · 公益科普 文化传承', w / 2, 740);
+    ctx.fillText(settings.location + ' · 公益科普 文化传承', w / 2, 740);
 
     var imgDataUrl = canvas.toDataURL('image/png');
 

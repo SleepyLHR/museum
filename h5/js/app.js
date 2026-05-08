@@ -1,23 +1,93 @@
 var App = (function () {
   'use strict';
 
+  var config = null;
+  var defaultRelics = [
+    {
+      id: 'relic1',
+      name: '加载中...',
+      image: 'images/relic1.png',
+      level: 1,
+      pieces: 9,
+      gridCols: 3,
+      gridRows: 3,
+      era: '清',
+      spec: '',
+      description: ''
+    }
+  ];
+
   var state = {
     userInfo: null,
     completedLevels: [],
     unlockedLevels: ['level1'],
-    relics: []
+    relics: defaultRelics.slice()
   };
 
   var levelTimes = {};
   var medalNumber = '';
   var firstCompletion = null;
+  var readyCallback = null;
+  var configLoaded = false;
 
-  function init() {
-    loadUserData();
-    loadLevelTimes();
-    loadMedalNumber();
-    loadFirstCompletion();
-    loadRelicsData();
+  function init(callback) {
+    readyCallback = callback;
+    loadConfig();
+  }
+
+  function loadConfig() {
+    fetch('config.json')
+      .then(function(res) {
+        if (!res.ok) throw new Error('配置文件加载失败');
+        return res.json();
+      })
+      .then(function(data) {
+        config = data;
+        state.relics = data.relics || defaultRelics.slice();
+        configLoaded = true;
+        loadUserData();
+        loadLevelTimes();
+        loadMedalNumber();
+        loadFirstCompletion();
+        if (readyCallback) readyCallback();
+      })
+      .catch(function(err) {
+        console.error('加载配置失败:', err);
+        config = { settings: { location: '巴渝民俗博物馆', totalLevels: 5, levelPrefix: 'level' } };
+        state.relics = defaultRelics.slice();
+        configLoaded = true;
+        loadUserData();
+        loadLevelTimes();
+        loadMedalNumber();
+        loadFirstCompletion();
+        if (readyCallback) readyCallback();
+      });
+  }
+
+  function isConfigLoaded() {
+    return configLoaded;
+  }
+
+  function getConfig() {
+    return config;
+  }
+
+  function getSettings() {
+    return config ? config.settings : { location: '巴渝民俗博物馆', totalLevels: 5, levelPrefix: 'level' };
+  }
+
+  function getTotalLevels() {
+    return config ? (config.settings.totalLevels || 5) : 5;
+  }
+
+  function getLevelOrder() {
+    var total = getTotalLevels();
+    var prefix = config ? (config.settings.levelPrefix || 'level') : 'level';
+    var order = [];
+    for (var i = 1; i <= total; i++) {
+      order.push(prefix + i);
+    }
+    return order;
   }
 
   function loadLevelTimes() {
@@ -52,7 +122,7 @@ var App = (function () {
 
   function getTotalTime() {
     var total = 0;
-    var levelOrder = ['level1', 'level2', 'level3', 'level4', 'level5'];
+    var levelOrder = getLevelOrder();
     for (var i = 0; i < levelOrder.length; i++) {
       total += (levelTimes[levelOrder[i]] || 0);
     }
@@ -148,74 +218,12 @@ var App = (function () {
     }
   }
 
-  function loadRelicsData() {
-    state.relics = [
-      {
-        id: 'relic1',
-        name: '龚晴皋题行书轴',
-        era: '清',
-        location: '巴渝民俗博物馆',
-        spec: '纵108.7厘米，横26.5厘米',
-        description: '龚晴皋被誉为"巴渝书坛第一人"，民间素有"家无晴皋字，必是俗家人"之说。《巴县志》称其为"县三百年来极高逸文艺之誉者"。馆藏《清龚晴皋题行书轴》碑帖交融、遒劲硬朗，为其上乘佳作。',
-        image: 'images/relic1.png',
-        level: 'level1',
-        pieces: 6
-      },
-      {
-        id: 'relic2',
-        name: '红陶提囊执便面俑',
-        era: '汉',
-        location: '巴渝民俗博物馆',
-        spec: '长9.1厘米，宽8.6厘米，高27.8厘米',
-        description: '此俑为泥质红陶圆雕中空立姿，梳高发髻，左手提袋，右手持便面。便面是古代遮面扇具，可遮挡面容，用于社交场合回避旁人、化解尴尬。',
-        image: 'images/relic2.jpg',
-        level: 'level2',
-        pieces: 8
-      },
-      {
-        id: 'relic3',
-        name: '祭祀风俗画',
-        era: '清',
-        location: '巴渝民俗博物馆',
-        spec: '纵132厘米，横61.3厘米',
-        description: '此系列风俗画色彩明亮，通过丰富的文化符号和传统元素，展现了不同历史阶段的社会风貌、民间信仰以及人们的生活方式，是研究古代民间绘画艺术发展的重要实例。',
-        image: 'images/relic3.png',
-        level: 'level3',
-        pieces: 10
-      },
-      {
-        id: 'relic4',
-        name: '满金雕花家神龛',
-        era: '清',
-        location: '巴渝民俗博物馆',
-        value: '国家二级文物',
-        spec: '高458厘米，宽170厘米，厚67厘米',
-        description: '家神龛俗称"香火"，民间用以敬香报本祈福。巴渝重其规制以显家族实力。此龛分座、身、顶三段，雕双龙飞龙、群仙图，恪守古法书"天地君亲师"牌位，楹联寓意慎终追远，金漆精工、庄严罕见，为国家二级文物。',
-        image: 'images/relic4.png',
-        level: 'level4',
-        pieces: 12
-      },
-      {
-        id: 'relic5',
-        name: '镂雕满金漆花鸟纹拔步床',
-        era: '清',
-        location: '巴渝民俗博物馆',
-        value: '国家二级文物',
-        spec: '高291厘米，宽274厘米，深281厘米',
-        description: '此重庆两江悦来戴氏古床，耗时三年由三位匠师精作。满金髹饰，雕有瓜蝶、牡丹、佛手寿桃及梅兰竹菊等纹样，寓意子孙绵延、富贵福寿、君子风骨。此床工艺精湛、意蕴丰厚，是巴渝金木雕代表作，为国家二级文物。',
-        image: 'images/relic5.png',
-        level: 'level5',
-        pieces: 15
-      }
-    ];
-  }
-
   function completeLevel(levelId) {
     if (state.completedLevels.indexOf(levelId) === -1) {
       state.completedLevels.push(levelId);
     }
 
-    var levelOrder = ['level1', 'level2', 'level3', 'level4', 'level5'];
+    var levelOrder = getLevelOrder();
     var currentIndex = levelOrder.indexOf(levelId);
     if (currentIndex < levelOrder.length - 1) {
       var nextLevel = levelOrder[currentIndex + 1];
@@ -257,10 +265,24 @@ var App = (function () {
     return '神秘玩家';
   }
 
-  init();
+  function getRelicByLevel(levelId) {
+    for (var i = 0; i < state.relics.length; i++) {
+      var relic = state.relics[i];
+      var relicLevelId = (config && config.settings ? config.settings.levelPrefix : 'level') + relic.level;
+      if (relicLevelId === levelId) {
+        return relic;
+      }
+    }
+    return state.relics[0] || null;
+  }
 
   return {
+    init: init,
     state: state,
+    getConfig: getConfig,
+    getSettings: getSettings,
+    getTotalLevels: getTotalLevels,
+    getLevelOrder: getLevelOrder,
     completeLevel: completeLevel,
     isLevelUnlocked: isLevelUnlocked,
     isLevelCompleted: isLevelCompleted,
@@ -274,6 +296,8 @@ var App = (function () {
     generateMedalNumber: generateMedalNumber,
     setFirstCompletion: setFirstCompletion,
     getFirstCompletion: getFirstCompletion,
-    hasFirstCompletion: hasFirstCompletion
+    hasFirstCompletion: hasFirstCompletion,
+    getRelicByLevel: getRelicByLevel,
+    isConfigLoaded: isConfigLoaded
   };
 })();

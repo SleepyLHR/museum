@@ -4,17 +4,17 @@ var HomePage = (function () {
   var selectedLevel = 'level1';
 
   function render() {
-    var levels = [
-      { id: 'level1', num: 1 },
-      { id: 'level2', num: 2 },
-      { id: 'level3', num: 3 },
-      { id: 'level4', num: 4 },
-      { id: 'level5', num: 5 }
-    ];
+    var settings = App.getSettings();
+    var totalLevels = App.getTotalLevels();
+    var levelPrefix = settings.levelPrefix || 'level';
+
+    var levels = [];
+    for (var i = 1; i <= totalLevels; i++) {
+      levels.push({ id: levelPrefix + i, num: i });
+    }
 
     var completed = App.state.completedLevels.length;
-    var total = 5;
-    var percent = (completed / total) * 100;
+    var percent = (completed / totalLevels) * 100;
 
     selectedLevel = getDefaultSelectedLevel();
 
@@ -34,7 +34,7 @@ var HomePage = (function () {
       levelHtml += '</div>';
     }
 
-    var currentRelic = getCurrentRelic();
+    var currentRelic = App.getRelicByLevel(selectedLevel);
     var previewHtml = '';
     if (currentRelic) {
       previewHtml = '<div class="preview-section">'
@@ -43,7 +43,7 @@ var HomePage = (function () {
         + '<div class="preview-image"><img src="' + currentRelic.image + '" alt="' + currentRelic.name + '"></div>'
         + '<div class="preview-info">'
         + '<span class="info-item">' + currentRelic.era + '</span>'
-        + '<span class="info-item">' + '重庆巴渝民俗博物馆馆藏' + '</span>'
+        + '<span class="info-item">' + settings.location + '馆藏</span>'
         + '</div>'
         + '</div>'
         + '</div>';
@@ -69,7 +69,7 @@ var HomePage = (function () {
       + '<div class="progress-section">'
       + '<div class="progress-title">关卡进度</div>'
       + '<div class="progress-bar-container"><div class="progress-bar" style="width:' + percent + '%"></div></div>'
-      + '<div class="progress-text">已完成 ' + completed + ' / 共 ' + total + ' 关</div>'
+      + '<div class="progress-text">已完成 ' + completed + ' / 共 ' + totalLevels + ' 关</div>'
       + '</div>'
       + '<div class="level-selector">' + levelHtml + '</div>'
       + previewHtml
@@ -82,22 +82,13 @@ var HomePage = (function () {
   }
 
   function getDefaultSelectedLevel() {
-    var levels = ['level1', 'level2', 'level3', 'level4', 'level5'];
-    for (var i = levels.length - 1; i >= 0; i--) {
-      if (App.isLevelUnlocked(levels[i])) {
-        return levels[i];
+    var levelOrder = App.getLevelOrder();
+    for (var i = levelOrder.length - 1; i >= 0; i--) {
+      if (App.isLevelUnlocked(levelOrder[i])) {
+        return levelOrder[i];
       }
     }
-    return 'level1';
-  }
-
-  function getCurrentRelic() {
-    for (var i = 0; i < App.state.relics.length; i++) {
-      if (App.state.relics[i].level === selectedLevel) {
-        return App.state.relics[i];
-      }
-    }
-    return App.state.relics[0];
+    return levelOrder[0];
   }
 
   function mount() {
@@ -163,7 +154,7 @@ var HomePage = (function () {
       }
     }
     
-    var currentRelic = getCurrentRelic();
+    var currentRelic = App.getRelicByLevel(selectedLevel);
     var previewImage = document.querySelector('.preview-image img');
     var previewTitle = document.querySelector('.preview-title');
     var previewInfo = document.querySelector('.preview-info');
@@ -188,10 +179,11 @@ var HomePage = (function () {
     }
     
     if (previewInfo && currentRelic) {
+      var settings = App.getSettings();
       var infoItems = previewInfo.querySelectorAll('.info-item');
       if (infoItems.length >= 2) {
         infoItems[0].textContent = currentRelic.era;
-        infoItems[1].textContent = '重庆巴渝民俗博物馆馆藏';
+        infoItems[1].textContent = settings.location + '馆藏';
       }
     }
   }

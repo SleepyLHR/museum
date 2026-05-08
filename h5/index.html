@@ -29,9 +29,10 @@
   <script src="js/pages/settings.js"></script>
   <script src="js/pages/certificate.js"></script>
   <script>
-    Router.init();
+    App.init(function() {
+      Router.init();
+    });
     
-    // 用户第一次交互时自动播放背景音乐
     var bgmStarted = false;
     
     function tryStartBgm() {
@@ -53,7 +54,6 @@
       }
     }
     
-    // 监听用户交互事件
     document.addEventListener('click', tryStartBgm, { once: true });
     document.addEventListener('touchstart', tryStartBgm, { once: true });
     document.addEventListener('keydown', tryStartBgm, { once: true });

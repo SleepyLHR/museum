@@ -3,11 +3,14 @@ var GalleryPage = (function () {
 
   function render() {
     var relics = App.state.relics;
+    var settings = App.getSettings();
+    var levelPrefix = settings.levelPrefix || 'level';
     var cardsHtml = '';
 
     for (var i = 0; i < relics.length; i++) {
       var item = relics[i];
-      var unlocked = App.isLevelCompleted(item.level);
+      var levelId = levelPrefix + item.level;
+      var unlocked = App.isLevelCompleted(levelId);
       var cls = 'relic-card';
       if (!unlocked) cls += ' locked';
 
@@ -37,11 +40,15 @@ var GalleryPage = (function () {
     });
 
     var cards = document.querySelectorAll('.relic-card');
+    var settings = App.getSettings();
+    var levelPrefix = settings.levelPrefix || 'level';
+
     for (var i = 0; i < cards.length; i++) {
       cards[i].addEventListener('click', function () {
         var idx = parseInt(this.getAttribute('data-relic-index'));
         var relic = App.state.relics[idx];
-        if (!App.isLevelCompleted(relic.level)) {
+        var levelId = levelPrefix + relic.level;
+        if (!App.isLevelCompleted(levelId)) {
           Toast.show('完成关卡后解锁');
           AudioManager.playError();
           return;
@@ -53,6 +60,7 @@ var GalleryPage = (function () {
   }
 
   function showRelicModal(relic) {
+    var settings = App.getSettings();
     var overlay = document.createElement('div');
     overlay.className = 'relic-modal-overlay';
     overlay.id = 'relic-modal-overlay';
@@ -63,9 +71,8 @@ var GalleryPage = (function () {
       + '<div class="relic-modal-details">'
       + '<div class="modal-name">' + relic.name + '</div>'
       + '<div class="modal-era">' + relic.era + '</div>'
-      + '<div class="modal-location">' + relic.location + '</div>'
+      + '<div class="modal-location">' + settings.location + '</div>'
       + '<div class="modal-spec">规格：' + (relic.spec || '') + '</div>'
-      + (relic.value ? '<div class="modal-value">' + relic.value + '</div>' : '')
       + '<div class="modal-description">' + relic.description + '</div>'
       + '</div>'
       + '</div>';
