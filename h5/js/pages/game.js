@@ -10,12 +10,16 @@ var GamePage = (function () {
   var gridCols = 3;
   var gridRows = 2;
   var completed = false;
+  var levelStartTime = 0;
 
   function render(params) {
     if (params && params.level) {
       currentLevel = params.level;
       currentLevelNum = parseInt(currentLevel.replace('level', ''));
     }
+
+    levelStartTime = Date.now();
+    completed = false;
 
     var found = null;
     for (var i = 0; i < App.state.relics.length; i++) {
@@ -27,7 +31,6 @@ var GamePage = (function () {
     relic = found || App.state.relics[0];
 
     calcGrid(relic.pieces);
-
     initPuzzle();
     completed = false;
     selectedPiece = null;
@@ -62,7 +65,6 @@ var GamePage = (function () {
         idx++;
       }
     }
-
     shufflePieces(puzzlePieces);
   }
 
@@ -158,11 +160,8 @@ var GamePage = (function () {
       rebuildPuzzleGrid();
       AudioManager.playMove();
 
-      console.log('Checking completion...');
       var isComplete = checkCompletion();
-      console.log('Completion check result:', isComplete);
       if (isComplete) {
-        console.log('Calling onCompletion...');
         AudioManager.playComplete();
         onCompletion();
       }
@@ -205,11 +204,8 @@ var GamePage = (function () {
   }
 
   function checkCompletion() {
-    console.log('Checking puzzle pieces:');
     for (var i = 0; i < puzzlePieces.length; i++) {
       var piece = puzzlePieces[i];
-      console.log('  Piece ' + i + ': row=' + piece.row + ', currentRow=' + piece.currentRow
-        + ', col=' + piece.col + ', currentCol=' + piece.currentCol);
       if (piece.row !== piece.currentRow || piece.col !== piece.currentCol) {
         return false;
       }
@@ -231,6 +227,9 @@ var GamePage = (function () {
 
   function onCompletion() {
     completed = true;
+
+    var elapsed = Math.round((Date.now() - levelStartTime) / 1000);
+    App.setLevelTime(currentLevel, elapsed);
     App.completeLevel(currentLevel);
 
     setTimeout(function () {
@@ -301,18 +300,23 @@ var GamePage = (function () {
   function showCertificateModal() {
     var now = new Date();
     var dateStr = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日';
-    var certNum = now.getFullYear() + String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+    var certNum = App.generateMedalNumber();
 
     var overlay = document.createElement('div');
     overlay.className = 'completion-overlay';
     overlay.id = 'cert-overlay';
 
+    var nickname = App.getNickname();
+    var totalSeconds = App.getTotalTime();
+    var totalTimeStr = App.formatTime(totalSeconds);
+
     overlay.innerHTML = '<div class="certificate-content">'
       + '<div class="certificate-title">文物拼图大挑战</div>'
       + '<div class="certificate-subtitle">电子荣誉证书</div>'
-      + '<div class="certificate-name">玩家</div>'
+      + '<div class="certificate-name">' + nickname + '</div>'
       + '<div class="certificate-text">成功完成全部文物拼图挑战</div>'
-      + '<div class="certificate-number">证书编号：BM' + certNum + '</div>'
+      + '<div class="certificate-total-time">通关总耗时：' + totalTimeStr + '</div>'
+      + '<div class="certificate-number">证书编号：' + certNum + '</div>'
       + '<div class="certificate-date">' + dateStr + '</div>'
       + '<div class="certificate-buttons">'
       + '<button class="btn-primary" id="btn-save-cert">保存证书</button>'
@@ -329,16 +333,109 @@ var GamePage = (function () {
     });
 
     document.getElementById('btn-save-cert').addEventListener('click', function () {
-      Toast.show('证书已保存', 'success');
-      setTimeout(function () {
-        overlay.remove();
-        Router.navigate('home');
-      }, 1500);
+      saveCertificateAsImage(nickname, totalTimeStr, certNum, dateStr);
     });
 
     document.getElementById('btn-close-cert').addEventListener('click', function () {
       overlay.remove();
       Router.navigate('home');
+    });
+  }
+
+  function saveCertificateAsImage(nickname, totalTimeStr, certNum, dateStr) {
+    var canvas = document.createElement('canvas');
+    var w = 750;
+    var h = 1050;
+    canvas.width = w;
+    canvas.height = h;
+    var ctx = canvas.getContext('2d');
+
+    var gradient = ctx.createLinearGradient(0, 0, 0, h);
+    gradient.addColorStop(0, '#ffffff');
+    gradient.addColorStop(0.5, '#f8f9fa');
+    gradient.addColorStop(1, '#f0f3e8');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = '#2ecc71';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(30, 30, w - 60, h - 60);
+
+    ctx.strokeStyle = '#c8e6c9';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(45, 45, w - 90, h - 90);
+
+    ctx.fillStyle = '#333';
+    ctx.font = 'bold 52px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('文物拼图大挑战', w / 2, 160);
+
+    ctx.fillStyle = '#2ecc71';
+    ctx.font = 'bold 36px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillText('电子荣誉证书', w / 2, 220);
+
+    ctx.strokeStyle = '#ddd';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(100, 260);
+    ctx.lineTo(w - 100, 260);
+    ctx.stroke();
+
+    ctx.fillStyle = '#2ecc71';
+    ctx.font = 'bold 60px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillText(nickname, w / 2, 360);
+
+    ctx.fillStyle = '#555';
+    ctx.font = '32px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillText('成功完成全部文物拼图挑战', w / 2, 430);
+
+    ctx.fillStyle = '#e67e22';
+    ctx.font = 'bold 32px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillText('通关总耗时：' + totalTimeStr, w / 2, 510);
+
+    ctx.strokeStyle = '#ddd';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(100, 560);
+    ctx.lineTo(w - 100, 560);
+    ctx.stroke();
+
+    ctx.fillStyle = '#888';
+    ctx.font = '22px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillText('证书编号：' + certNum, w / 2, 620);
+
+    ctx.fillStyle = '#aaa';
+    ctx.font = '22px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillText(dateStr, w / 2, 670);
+
+    ctx.fillStyle = '#999';
+    ctx.font = '20px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.fillText('巴渝民俗博物馆 · 公益科普 文化传承', w / 2, 740);
+
+    var imgDataUrl = canvas.toDataURL('image/png');
+
+    var certOverlay = document.createElement('div');
+    certOverlay.className = 'certificate-image-overlay';
+    certOverlay.id = 'cert-image-overlay';
+
+    certOverlay.innerHTML = '<div class="cert-image-container">'
+      + '<img src="' + imgDataUrl + '" class="cert-image" alt="荣誉证书">'
+      + '<div class="save-hint">长按图片保存到相册</div>'
+      + '<button class="btn-close-cert-image" id="btn-close-cert-image">关闭</button>'
+      + '</div>';
+
+    document.body.appendChild(certOverlay);
+
+    document.getElementById('btn-close-cert-image').addEventListener('click', function () {
+      document.body.removeChild(certOverlay);
+      Router.navigate('home');
+    });
+
+    certOverlay.addEventListener('click', function (e) {
+      if (e.target === certOverlay) {
+        document.body.removeChild(certOverlay);
+        Router.navigate('home');
+      }
     });
   }
 
@@ -354,6 +451,8 @@ var GamePage = (function () {
     var existing = document.getElementById('completion-overlay');
     if (existing) existing.remove();
     existing = document.getElementById('cert-overlay');
+    if (existing) existing.remove();
+    existing = document.getElementById('cert-image-overlay');
     if (existing) existing.remove();
   }
 

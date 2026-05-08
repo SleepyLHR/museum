@@ -8,9 +8,89 @@ var App = (function () {
     relics: []
   };
 
+  var levelTimes = {};
+  var medalNumber = '';
+
   function init() {
     loadUserData();
+    loadLevelTimes();
+    loadMedalNumber();
     loadRelicsData();
+  }
+
+  function loadLevelTimes() {
+    try {
+      var data = localStorage.getItem('levelTimes');
+      if (data) {
+        levelTimes = JSON.parse(data);
+      }
+    } catch (e) {
+      levelTimes = {};
+    }
+  }
+
+  function saveLevelTimes() {
+    try {
+      localStorage.setItem('levelTimes', JSON.stringify(levelTimes));
+    } catch (e) {
+      console.error('保存关卡用时失败', e);
+    }
+  }
+
+  function getLevelTime(levelId) {
+    return levelTimes[levelId] || 0;
+  }
+
+  function setLevelTime(levelId, seconds) {
+    if (!levelTimes[levelId] || seconds < levelTimes[levelId]) {
+      levelTimes[levelId] = seconds;
+    }
+    saveLevelTimes();
+  }
+
+  function getTotalTime() {
+    var total = 0;
+    var levelOrder = ['level1', 'level2', 'level3', 'level4', 'level5'];
+    for (var i = 0; i < levelOrder.length; i++) {
+      total += (levelTimes[levelOrder[i]] || 0);
+    }
+    return total;
+  }
+
+  function formatTime(seconds) {
+    var m = Math.floor(seconds / 60);
+    var s = seconds % 60;
+    if (m > 0) {
+      return m + '分' + s + '秒';
+    }
+    return s + '秒';
+  }
+
+  function loadMedalNumber() {
+    try {
+      var stored = localStorage.getItem('medalNumber');
+      if (stored) {
+        medalNumber = stored;
+      }
+    } catch (e) {
+      medalNumber = '';
+    }
+  }
+
+  function getMedalNumber() {
+    return medalNumber;
+  }
+
+  function generateMedalNumber() {
+    if (medalNumber) return medalNumber;
+    var now = new Date();
+    var ts = String(Date.now());
+    var suffix = ts.slice(-7);
+    medalNumber = 'BM' + now.getFullYear() + suffix;
+    try {
+      localStorage.setItem('medalNumber', medalNumber);
+    } catch (e) {}
+    return medalNumber;
   }
 
   function loadUserData() {
@@ -127,7 +207,21 @@ var App = (function () {
   function resetProgress() {
     state.completedLevels = [];
     state.unlockedLevels = ['level1'];
+    levelTimes = {};
+    medalNumber = '';
     localStorage.removeItem('userData');
+    localStorage.removeItem('levelTimes');
+    localStorage.removeItem('medalNumber');
+  }
+
+  function getNickname() {
+    try {
+      var stored = localStorage.getItem('nickname');
+      if (stored && stored.trim()) {
+        return stored.trim();
+      }
+    } catch (e) {}
+    return '神秘玩家';
   }
 
   init();
@@ -137,6 +231,13 @@ var App = (function () {
     completeLevel: completeLevel,
     isLevelUnlocked: isLevelUnlocked,
     isLevelCompleted: isLevelCompleted,
-    resetProgress: resetProgress
+    resetProgress: resetProgress,
+    getNickname: getNickname,
+    getLevelTime: getLevelTime,
+    setLevelTime: setLevelTime,
+    getTotalTime: getTotalTime,
+    formatTime: formatTime,
+    getMedalNumber: getMedalNumber,
+    generateMedalNumber: generateMedalNumber
   };
 })();

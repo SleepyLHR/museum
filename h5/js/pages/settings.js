@@ -3,7 +3,7 @@ var SettingsPage = (function () {
 
   function render() {
     var userId = getUserId();
-
+    var nickname = App.getNickname();
     var musicChecked = getSetting('musicEnabled', true) ? 'checked' : '';
     var soundChecked = getSetting('soundEnabled', true) ? 'checked' : '';
 
@@ -17,7 +17,14 @@ var SettingsPage = (function () {
       + '<div class="user-section">'
       + '<div class="user-avatar">👤</div>'
       + '<div class="user-info">'
-      + '<div class="user-name">玩家</div>'
+      + '<div class="user-name-container" id="user-name-container">'
+      + '<span class="user-name" id="user-name-display">' + escapeHtml(nickname) + '</span>'
+      + '<span class="user-name-edit" id="btn-edit-nickname">✎</span>'
+      + '</div>'
+      + '<div class="user-name-input-wrap" id="nickname-input-wrap">'
+      + '<input type="text" class="user-name-input" id="nickname-input" maxlength="12" placeholder="请输入昵称">'
+      + '<button class="nickname-save-btn" id="btn-save-nickname">保存</button>'
+      + '</div>'
       + '<div class="user-id">ID: ' + userId + '</div>'
       + '</div>'
       + '</div>'
@@ -35,6 +42,12 @@ var SettingsPage = (function () {
       + '<div class="version-info">版本号: v2.0.0 (H5)</div>'
       + '</div>'
       + '</div>';
+  }
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
   }
 
   function buildSwitchItem(icon, label, id, checked) {
@@ -92,18 +105,43 @@ var SettingsPage = (function () {
       Router.navigate('home');
     });
 
+    document.getElementById('btn-edit-nickname').addEventListener('click', function (e) {
+      e.stopPropagation();
+      showNicknameInput();
+    });
+
+    document.getElementById('user-name-display').addEventListener('click', function () {
+      showNicknameInput();
+    });
+
+    document.getElementById('btn-save-nickname').addEventListener('click', function () {
+      saveNickname();
+    });
+
+    document.getElementById('nickname-input').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        saveNickname();
+      }
+    });
+
+    document.getElementById('nickname-input').addEventListener('blur', function () {
+      var display = document.getElementById('user-name-display');
+      if (display && display.style.display !== 'none') return;
+      saveNickname();
+    });
+
     var switches = ['setting-music', 'setting-sound'];
     for (var i = 0; i < switches.length; i++) {
       document.getElementById(switches[i]).addEventListener('change', function (e) {
         saveSettings();
-        
+
         var settingId = e.target.id;
-        
+
         if (settingId === 'setting-music') {
           var musicEnabled = document.getElementById('setting-music').checked;
           AudioManager.setBgmEnabled(musicEnabled);
         }
-        
+
         if (settingId === 'setting-sound') {
           var soundEnabled = document.getElementById('setting-sound').checked;
           AudioManager.setSfxEnabled(soundEnabled);
@@ -120,6 +158,44 @@ var SettingsPage = (function () {
         }
       });
     });
+  }
+
+  function showNicknameInput() {
+    var display = document.getElementById('user-name-display');
+    var edit = document.getElementById('btn-edit-nickname');
+    var wrap = document.getElementById('nickname-input-wrap');
+    var input = document.getElementById('nickname-input');
+
+    display.style.display = 'none';
+    edit.style.display = 'none';
+    wrap.style.display = 'flex';
+
+    var current = App.getNickname();
+    input.value = (current === '神秘玩家') ? '' : current;
+    input.focus();
+  }
+
+  function saveNickname() {
+    var input = document.getElementById('nickname-input');
+    var display = document.getElementById('user-name-display');
+    var edit = document.getElementById('btn-edit-nickname');
+    var wrap = document.getElementById('nickname-input-wrap');
+
+    if (!input || !display || !edit || !wrap) return;
+
+    var nickname = input.value.trim();
+    if (!nickname) {
+      nickname = '神秘玩家';
+    }
+
+    try {
+      localStorage.setItem('nickname', nickname);
+    } catch (e) {}
+
+    display.textContent = nickname;
+    display.style.display = '';
+    edit.style.display = '';
+    wrap.style.display = 'none';
   }
 
   function unmount() {
