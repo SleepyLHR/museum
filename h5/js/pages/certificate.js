@@ -35,7 +35,7 @@ var CertificatePage = (function () {
 
   function buildCertCard(data) {
     return '<div class="certificate-preview">'
-      + '<div class="cert-preview-title">文物拼图大挑战</div>'
+      + '<div class="cert-preview-title">文物拼多多</div>'
       + '<div class="cert-preview-subtitle">' + data.subtitle + '</div>'
       + '<div class="cert-preview-divider"></div>'
       + '<div class="cert-preview-name">' + data.nickname + '</div>'

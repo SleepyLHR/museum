@@ -331,7 +331,7 @@ var GamePage = (function () {
 
     overlay.innerHTML = '<div class="certificate-content first-completion">'
       + '<div class="celebration">🎉 恭喜首次通关！</div>'
-      + '<div class="certificate-title">文物拼图大挑战</div>'
+      + '<div class="certificate-title">文物拼多多</div>'
       + '<div class="certificate-subtitle">电子荣誉证书 · 首次通关纪念</div>'
       + '<div class="certificate-name">' + nickname + '</div>'
       + '<div class="certificate-text">成功完成全部文物拼图挑战</div>'
@@ -391,7 +391,7 @@ var GamePage = (function () {
     ctx.fillStyle = '#333';
     ctx.font = 'bold 52px "PingFang SC", "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('文物拼图大挑战', w / 2, 160);
+    ctx.fillText('文物拼多多', w / 2, 160);
 
     ctx.fillStyle = '#2ecc71';
     ctx.font = 'bold 36px "PingFang SC", "Microsoft YaHei", sans-serif';
