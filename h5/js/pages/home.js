@@ -50,17 +50,22 @@ var HomePage = (function () {
     }
 
     var hasCert = App.hasFirstCompletion();
+    var rankHasNew = App.hasNewRank();
+
+    var rankBadgeHtml = rankHasNew ? '<span class="rank-badge-dot"></span>' : '';
 
     var bottomButtonsHtml = '';
     if (hasCert) {
       bottomButtonsHtml = '<div class="bottom-nav-row">'
         + '<button class="bottom-nav-btn" id="btn-gallery-new">🖼 图库</button>'
         + '<button class="bottom-nav-btn cert-btn" id="btn-cert">🏆 证书</button>'
+        + '<button class="bottom-nav-btn rank-btn' + (rankHasNew ? ' has-new-rank' : '') + '" id="btn-rank">🏅 排行' + rankBadgeHtml + '</button>'
         + '<button class="bottom-nav-btn" id="btn-settings-new">⚙ 设置</button>'
         + '</div>';
     } else {
       bottomButtonsHtml = '<div class="bottom-nav-row">'
         + '<button class="bottom-nav-btn" id="btn-gallery-new">🖼 图库</button>'
+        + '<button class="bottom-nav-btn rank-btn' + (rankHasNew ? ' has-new-rank' : '') + '" id="btn-rank">🏅 排行' + rankBadgeHtml + '</button>'
         + '<button class="bottom-nav-btn" id="btn-settings-new">⚙ 设置</button>'
         + '</div>';
     }
@@ -138,6 +143,14 @@ var HomePage = (function () {
       settingsBtn.addEventListener('click', function () {
         AudioManager.playClick();
         Router.navigate('settings');
+      });
+    }
+
+    var rankBtn = document.getElementById('btn-rank');
+    if (rankBtn) {
+      rankBtn.addEventListener('click', function () {
+        AudioManager.playClick();
+        Router.navigate('rank');
       });
     }
   }

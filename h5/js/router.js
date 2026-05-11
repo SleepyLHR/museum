@@ -69,6 +69,7 @@ var Router = (function () {
       case 'gallery': handler = GalleryPage; break;
       case 'settings': handler = SettingsPage; break;
       case 'certificate': handler = CertificatePage; break;
+      case 'rank': handler = RankPage; break;
       default:
         handler = HomePage;
         page = 'home';

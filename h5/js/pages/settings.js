@@ -2,7 +2,7 @@ var SettingsPage = (function () {
   'use strict';
 
   function render() {
-    var userId = getUserId();
+    var userId = App.getUserId() || '加载中...';
     var nickname = App.getNickname();
     var musicChecked = getSetting('musicEnabled', true) ? 'checked' : '';
     var soundChecked = getSetting('soundEnabled', true) ? 'checked' : '';
@@ -25,7 +25,7 @@ var SettingsPage = (function () {
       + '<input type="text" class="user-name-input" id="nickname-input" maxlength="12" placeholder="请输入昵称">'
       + '<button class="nickname-save-btn" id="btn-save-nickname">保存</button>'
       + '</div>'
-      + '<div class="user-id">ID: ' + userId + '</div>'
+      + '<div class="user-id">ID: ' + escapeHtml(userId) + '</div>'
       + '</div>'
       + '</div>'
       + '</div>'
@@ -39,7 +39,7 @@ var SettingsPage = (function () {
       + '<button class="action-btn primary" id="btn-home">返回首页</button>'
       + '</div>'
       + '</div>'
-      + '<div class="version-info">版本号: v2.0.0 (H5)</div>'
+      + '<div class="version-info">版本号: v2.1.0 (H5)</div>'
       + '</div>'
       + '</div>';
   }
@@ -61,15 +61,6 @@ var SettingsPage = (function () {
       + '<span class="toggle-slider"></span>'
       + '</label>'
       + '</div>';
-  }
-
-  function getUserId() {
-    var userId = localStorage.getItem('userId');
-    if (!userId) {
-      userId = 'U' + Date.now() + Math.floor(Math.random() * 1000);
-      localStorage.setItem('userId', userId);
-    }
-    return userId;
   }
 
   function getSetting(key, defaultVal) {
@@ -196,6 +187,8 @@ var SettingsPage = (function () {
     display.style.display = '';
     edit.style.display = '';
     wrap.style.display = 'none';
+
+    App.updateNicknameOnServer(nickname);
   }
 
   function unmount() {

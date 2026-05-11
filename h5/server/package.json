@@ -1,0 +1,16 @@
+{
+  "name": "museum-server",
+  "version": "1.0.0",
+  "description": "文物拼多多后端服务",
+  "main": "museum-server.js",
+  "scripts": {
+    "start": "node museum-server.js",
+    "dev": "node museum-server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

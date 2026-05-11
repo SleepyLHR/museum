@@ -30,6 +30,12 @@ var App = (function () {
   var readyCallback = null;
   var configLoaded = false;
 
+  var token = '';
+  var userId = '';
+  var isAnonymousUser = true;
+  var serverAvailable = true;
+  var rankNewBadges = [];
+
   function init(callback) {
     readyCallback = callback;
     loadConfig();
@@ -45,22 +51,20 @@ var App = (function () {
         config = data;
         state.relics = data.relics || defaultRelics.slice();
         configLoaded = true;
-        loadUserData();
-        loadLevelTimes();
-        loadMedalNumber();
-        loadFirstCompletion();
-        if (readyCallback) readyCallback();
+        loadLocalData();
+        initSession(function() {
+          if (readyCallback) readyCallback();
+        });
       })
       .catch(function(err) {
         console.error('加载配置失败:', err);
         config = { settings: { location: '巴渝民俗博物馆', totalLevels: 5, levelPrefix: 'level' } };
         state.relics = defaultRelics.slice();
         configLoaded = true;
-        loadUserData();
-        loadLevelTimes();
-        loadMedalNumber();
-        loadFirstCompletion();
-        if (readyCallback) readyCallback();
+        loadLocalData();
+        initSession(function() {
+          if (readyCallback) readyCallback();
+        });
       });
   }
 
@@ -88,6 +92,13 @@ var App = (function () {
       order.push(prefix + i);
     }
     return order;
+  }
+
+  function loadLocalData() {
+    loadUserData();
+    loadLevelTimes();
+    loadMedalNumber();
+    loadFirstCompletion();
   }
 
   function loadLevelTimes() {
@@ -118,6 +129,9 @@ var App = (function () {
       levelTimes[levelId] = seconds;
     }
     saveLevelTimes();
+    if (serverAvailable) {
+      syncProgress();
+    }
   }
 
   function getTotalTime() {
@@ -233,6 +247,9 @@ var App = (function () {
     }
 
     saveUserData();
+    if (serverAvailable) {
+      syncProgress();
+    }
   }
 
   function isLevelUnlocked(levelId) {
@@ -253,6 +270,9 @@ var App = (function () {
     localStorage.removeItem('levelTimes');
     localStorage.removeItem('medalNumber');
     localStorage.removeItem('firstCompletion');
+    if (serverAvailable && token) {
+      syncProgress();
+    }
   }
 
   function getNickname() {
@@ -274,6 +294,229 @@ var App = (function () {
       }
     }
     return state.relics[0] || null;
+  }
+
+  function isInWechat() {
+    var ua = navigator.userAgent || '';
+    return ua.indexOf('MicroMessenger') !== -1;
+  }
+
+  function getToken() {
+    if (token) return token;
+    try {
+      token = localStorage.getItem('serverToken') || '';
+    } catch (e) {}
+    return token;
+  }
+
+  function saveToken(newToken, newUserId) {
+    token = newToken;
+    userId = newUserId;
+    try {
+      localStorage.setItem('serverToken', token);
+      localStorage.setItem('serverUserId', userId);
+    } catch (e) {}
+  }
+
+  function clearToken() {
+    token = '';
+    userId = '';
+    try {
+      localStorage.removeItem('serverToken');
+      localStorage.removeItem('serverUserId');
+    } catch (e) {}
+  }
+
+  function callApi(method, path, body) {
+    return new Promise(function(resolve, reject) {
+      var headers = { 'Content-Type': 'application/json' };
+      var t = getToken();
+      if (t) {
+        headers['Authorization'] = 'Bearer ' + t;
+      }
+      var options = {
+        method: method,
+        headers: headers
+      };
+      if (body && (method === 'POST' || method === 'PUT')) {
+        options.body = JSON.stringify(body);
+      }
+      fetch(path, options)
+        .then(function(res) {
+          if (res.status === 401) {
+            clearToken();
+            reject(new Error('Unauthorized'));
+            return;
+          }
+          if (!res.ok) {
+            reject(new Error('API error: ' + res.status));
+            return;
+          }
+          return res.json();
+        })
+        .then(function(data) {
+          resolve(data);
+        })
+        .catch(function(err) {
+          reject(err);
+        });
+    });
+  }
+
+  function initSession(callback) {
+    var urlParams = (function() {
+      try {
+        var search = location.search;
+        if (!search) return {};
+        var params = {};
+        search.slice(1).split('&').forEach(function(pair) {
+          var parts = pair.split('=');
+          params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1] || '');
+        });
+        return params;
+      } catch (e) { return {}; }
+    })();
+
+    var tokenFromUrl = urlParams.token;
+    if (tokenFromUrl) {
+      saveToken(tokenFromUrl, '');
+      if (history.replaceState) {
+        history.replaceState({}, '', location.pathname + location.hash);
+      }
+    }
+
+    callApi('POST', '/api/user/session', {})
+      .then(function(data) {
+        serverAvailable = true;
+        saveToken(data.token, data.userId);
+        userId = data.userId;
+        isAnonymousUser = data.isAnonymous;
+
+        try {
+          localStorage.setItem('serverUserId', data.userId);
+          if (data.nickname) {
+            localStorage.setItem('nickname', data.nickname);
+          }
+        } catch (e) {}
+
+        if (data.unlockedLevels && data.unlockedLevels.length > 0) {
+          state.unlockedLevels = data.unlockedLevels;
+          state.completedLevels = data.completedLevels || [];
+          levelTimes = data.levelTimes || {};
+          saveUserData();
+          saveLevelTimes();
+        }
+
+        console.log('[App] Session initialized:', data.userId, data.isAnonymous ? '(anonymous)' : '(wechat)');
+        if (callback) callback();
+      })
+      .catch(function(err) {
+        console.warn('[App] Server unavailable, using local mode:', err.message);
+        serverAvailable = false;
+        try {
+          var storedToken = localStorage.getItem('serverToken');
+          var storedUserId = localStorage.getItem('serverUserId');
+          if (storedToken) token = storedToken;
+          if (storedUserId) userId = storedUserId;
+        } catch (e) {}
+        if (callback) callback();
+      });
+  }
+
+  function syncProgress() {
+    if (!token || !serverAvailable) return;
+    callApi('POST', '/api/user/progress', {
+      unlockedLevels: state.unlockedLevels,
+      completedLevels: state.completedLevels,
+      levelTimes: levelTimes,
+      totalTime: getTotalTime()
+    }).catch(function(err) {
+      console.warn('[App] Sync progress failed:', err.message);
+    });
+  }
+
+  function loadProgress() {
+    return callApi('GET', '/api/user/progress', null)
+      .then(function(data) {
+        if (data.unlockedLevels) {
+          state.unlockedLevels = data.unlockedLevels;
+          state.completedLevels = data.completedLevels || [];
+          levelTimes = data.levelTimes || {};
+          saveUserData();
+          saveLevelTimes();
+        }
+        return data;
+      });
+  }
+
+  function getUserId() {
+    return userId;
+  }
+
+  function isAnonymous() {
+    return isAnonymousUser;
+  }
+
+  function isServerAvailable() {
+    return serverAvailable;
+  }
+
+  function updateNicknameOnServer(nickname) {
+    if (!serverAvailable || !token) return Promise.resolve();
+    return callApi('PUT', '/api/user/nickname', { nickname: nickname })
+      .catch(function(err) {
+        console.warn('[App] Update nickname failed:', err.message);
+      });
+  }
+
+  function hasNewRank() {
+    try {
+      return localStorage.getItem('rankHasNew') === '1';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function markRankViewed() {
+    try {
+      localStorage.setItem('rankHasNew', '0');
+    } catch (e) {}
+  }
+
+  function setRankNew() {
+    try {
+      localStorage.setItem('rankHasNew', '1');
+    } catch (e) {}
+  }
+
+  function getBestDailyRank() {
+    try {
+      var data = localStorage.getItem('bestRankInfo');
+      if (data) {
+        return JSON.parse(data).bestDailyRank || 0;
+      }
+    } catch (e) {}
+    return 0;
+  }
+
+  function getBestTotalRank() {
+    try {
+      var data = localStorage.getItem('bestRankInfo');
+      if (data) {
+        return JSON.parse(data).bestTotalRank || 0;
+      }
+    } catch (e) {}
+    return 0;
+  }
+
+  function saveBestRankInfo(bestDailyRank, bestTotalRank, updatedDate) {
+    try {
+      localStorage.setItem('bestRankInfo', JSON.stringify({
+        bestDailyRank: bestDailyRank,
+        bestTotalRank: bestTotalRank,
+        updatedDate: updatedDate
+      }));
+    } catch (e) {}
   }
 
   return {
@@ -298,6 +541,21 @@ var App = (function () {
     getFirstCompletion: getFirstCompletion,
     hasFirstCompletion: hasFirstCompletion,
     getRelicByLevel: getRelicByLevel,
-    isConfigLoaded: isConfigLoaded
+    isConfigLoaded: isConfigLoaded,
+    isInWechat: isInWechat,
+    getToken: getToken,
+    getUserId: getUserId,
+    isAnonymous: isAnonymous,
+    isServerAvailable: isServerAvailable,
+    syncProgress: syncProgress,
+    loadProgress: loadProgress,
+    updateNicknameOnServer: updateNicknameOnServer,
+    callApi: callApi,
+    hasNewRank: hasNewRank,
+    markRankViewed: markRankViewed,
+    setRankNew: setRankNew,
+    getBestDailyRank: getBestDailyRank,
+    getBestTotalRank: getBestTotalRank,
+    saveBestRankInfo: saveBestRankInfo
   };
 })();
