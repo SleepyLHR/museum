@@ -4,11 +4,35 @@ var url = require('url');
 var fs = require('fs');
 var path = require('path');
 var crypto = require('crypto');
-var Database = require('better-sqlite3');
 
 var config = require('./config');
 
-var db = null;
+var dataPath = path.resolve(__dirname, 'data', 'data.json');
+var data = { users: [], dailyScores: [] };
+
+function loadData() {
+  try {
+    if (fs.existsSync(dataPath)) {
+      var raw = fs.readFileSync(dataPath, 'utf8');
+      data = JSON.parse(raw);
+    }
+  } catch (e) {
+    console.error('Load data error:', e.message);
+    data = { users: [], dailyScores: [] };
+  }
+}
+
+function saveData() {
+  try {
+    var dir = path.dirname(dataPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(dataPath, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Save data error:', e.message);
+  }
+}
 
 var LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3 };
 var currentLogLevel = LOG_LEVELS[config.log.level] || LOG_LEVELS.info;
@@ -26,51 +50,9 @@ function log(level) {
 }
 
 function initDatabase() {
-  var dbPath = path.resolve(__dirname, config.database.path);
-  var dbDir = path.dirname(dbPath);
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-  }
-  db = new Database(dbPath);
-  db.pragma('journal_mode = WAL');
-  log('info', 'Database connected:', dbPath);
-
-  db.exec(''
-    + 'CREATE TABLE IF NOT EXISTS users ('
-    + '  id               TEXT PRIMARY KEY,'
-    + '  openid           TEXT UNIQUE,'
-    + '  token            TEXT NOT NULL UNIQUE,'
-    + '  nickname         TEXT DEFAULT \'神秘玩家\','
-    + '  unlocked_levels  TEXT DEFAULT \'["level1"]\','
-    + '  completed_levels TEXT DEFAULT \'[]\','
-    + '  level_times      TEXT DEFAULT \'{}\','
-    + '  total_time       INTEGER DEFAULT 0,'
-    + '  is_anonymous     INTEGER DEFAULT 1,'
-    + '  best_daily_rank  INTEGER DEFAULT 0,'
-    + '  best_total_rank  INTEGER DEFAULT 0,'
-    + '  daily_rank_updated_date TEXT DEFAULT \'\','
-    + '  yesterday_daily_rank INTEGER DEFAULT 0,'
-    + '  yesterday_rank_updated TEXT DEFAULT \'\','
-    + '  created_at       TEXT NOT NULL,'
-    + '  last_active_at   TEXT NOT NULL'
-    + ');'
-  );
-
-  db.exec(''
-    + 'CREATE TABLE IF NOT EXISTS daily_scores ('
-    + '  id INTEGER PRIMARY KEY AUTOINCREMENT,'
-    + '  user_id TEXT NOT NULL,'
-    + '  nickname TEXT NOT NULL,'
-    + '  total_time INTEGER NOT NULL,'
-    + '  score_date TEXT NOT NULL,'
-    + '  created_at TEXT NOT NULL'
-    + ');'
-  );
-
-  db.exec('CREATE INDEX IF NOT EXISTS idx_daily_scores_date ON daily_scores(score_date);');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_daily_scores_date_time ON daily_scores(score_date, total_time);');
-
-  log('info', 'Database tables initialized');
+  loadData();
+  log('info', 'Database loaded:', dataPath);
+  log('info', 'Users:', data.users.length, '| Daily scores:', data.dailyScores.length);
 }
 
 function generateToken() {
@@ -84,40 +66,80 @@ function generateUserId() {
 }
 
 function getUserByToken(token) {
-  var stmt = db.prepare('SELECT * FROM users WHERE token = ?');
-  return stmt.get(token);
+  return data.users.find(function(u) { return u.token === token; }) || null;
 }
 
 function getUserByOpenid(openid) {
-  var stmt = db.prepare('SELECT * FROM users WHERE openid = ?');
-  return stmt.get(openid);
+  return data.users.find(function(u) { return u.openid === openid; }) || null;
+}
+
+function saveUser(user) {
+  var index = data.users.findIndex(function(u) { return u.id === user.id; });
+  if (index >= 0) {
+    data.users[index] = user;
+  } else {
+    data.users.push(user);
+  }
+  saveData();
+}
+
+var NICKNAME_PREFIXES = [
+  '快乐', '勇敢', '幸运', '勤劳', '智慧', '热心', '阳光', '可爱',
+  '好奇', '自由', '聪慧', '温暖', '元气', '灵动', '远方', '追风'
+];
+var NICKNAME_SUFFIXES = [
+  '拼图家', '探险者', '寻宝人', '收藏家', '访客', '文博迷', '发现者', '守护者'
+];
+
+function generateNickname() {
+  var existingNicknames = {};
+  for (var i = 0; i < data.users.length; i++) {
+    existingNicknames[data.users[i].nickname] = true;
+  }
+
+  var attempts = 0;
+  var maxAttempts = 300;
+  while (attempts < maxAttempts) {
+    var prefix = NICKNAME_PREFIXES[Math.floor(Math.random() * NICKNAME_PREFIXES.length)];
+    var suffix = NICKNAME_SUFFIXES[Math.floor(Math.random() * NICKNAME_SUFFIXES.length)];
+    var num = String(Math.floor(Math.random() * 900) + 100);
+    var nickname = prefix + suffix + num;
+    if (!existingNicknames[nickname]) {
+      return nickname;
+    }
+    attempts++;
+  }
+  return '神秘' + Date.now().toString(36);
 }
 
 function createUser(openid, isAnonymous) {
   var userId = generateUserId();
   var token = generateToken();
   var now = new Date().toISOString();
-  var stmt = db.prepare(''
-    + 'INSERT INTO users (id, openid, token, nickname, unlocked_levels, completed_levels, level_times, total_time, is_anonymous, created_at, last_active_at)'
-    + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  );
-  stmt.run(
-    userId,
-    openid || null,
-    token,
-    '神秘玩家',
-    '["level1"]',
-    '[]',
-    '{}',
-    0,
-    isAnonymous ? 1 : 0,
-    now,
-    now
-  );
+  var nickname = generateNickname();
+  var user = {
+    id: userId,
+    openid: openid || null,
+    token: token,
+    nickname: nickname,
+    unlocked_levels: ['level1'],
+    completed_levels: [],
+    level_times: {},
+    total_time: 0,
+    is_anonymous: isAnonymous ? 1 : 0,
+    best_daily_rank: 0,
+    best_total_rank: 0,
+    daily_rank_updated_date: '',
+    yesterday_daily_rank: 0,
+    yesterday_rank_updated: '',
+    created_at: now,
+    last_active_at: now
+  };
+  saveUser(user);
   return {
     id: userId,
     token: token,
-    nickname: '神秘玩家',
+    nickname: nickname,
     openid: openid,
     isAnonymous: !!isAnonymous,
     unlockedLevels: ['level1'],
@@ -220,15 +242,6 @@ var router = {
   '/api/rank/my': { GET: handleRankMy }
 };
 
-function findHandler(pathname, method) {
-  if (router[pathname] && router[pathname][method]) {
-    return router[pathname][method];
-  }
-  var wxMatch = pathname.match(/^\/api\/wx\/callback/);
-  if (wxMatch && method === 'GET') return handleWxCallback;
-  return null;
-}
-
 async function handleSessionPost(req, res, pathname, query) {
   var token = getTokenFromHeader(req);
   var body = {};
@@ -238,16 +251,17 @@ async function handleSessionPost(req, res, pathname, query) {
     var user = getUserByToken(token);
     if (user) {
       var now = new Date().toISOString();
-      db.prepare('UPDATE users SET last_active_at = ? WHERE id = ?').run(now, user.id);
+      user.last_active_at = now;
+      saveData();
       sendJson(res, 200, {
         userId: user.id,
         token: user.token,
         nickname: user.nickname,
         openid: user.openid,
         isAnonymous: !!user.is_anonymous,
-        unlockedLevels: JSON.parse(user.unlocked_levels),
-        completedLevels: JSON.parse(user.completed_levels),
-        levelTimes: JSON.parse(user.level_times),
+        unlockedLevels: user.unlocked_levels,
+        completedLevels: user.completed_levels,
+        levelTimes: user.level_times,
         totalTime: user.total_time,
         isNew: false
       });
@@ -307,16 +321,17 @@ function handleSessionGet(req, res, pathname, query) {
     return;
   }
   var now = new Date().toISOString();
-  db.prepare('UPDATE users SET last_active_at = ? WHERE id = ?').run(now, user.id);
+  user.last_active_at = now;
+  saveData();
   sendJson(res, 200, {
     userId: user.id,
     token: user.token,
     nickname: user.nickname,
     openid: user.openid,
     isAnonymous: !!user.is_anonymous,
-    unlockedLevels: JSON.parse(user.unlocked_levels),
-    completedLevels: JSON.parse(user.completed_levels),
-    levelTimes: JSON.parse(user.level_times),
+    unlockedLevels: user.unlocked_levels,
+    completedLevels: user.completed_levels,
+    levelTimes: user.level_times,
     totalTime: user.total_time,
     isNew: false
   });
@@ -357,7 +372,8 @@ async function handleUserNickname(req, res, pathname, query) {
   try { body = await parseJsonBody(req); } catch (e) {}
   var nickname = body.nickname || '神秘玩家';
   if (nickname.length > 20) nickname = nickname.slice(0, 20);
-  db.prepare('UPDATE users SET nickname = ? WHERE id = ?').run(nickname, user.id);
+  user.nickname = nickname;
+  saveData();
   log('info', 'User nickname updated:', user.id, nickname);
   sendJson(res, 200, { success: true, nickname: nickname });
 }
@@ -374,9 +390,9 @@ function handleProgressGet(req, res, pathname, query) {
     return;
   }
   sendJson(res, 200, {
-    unlockedLevels: JSON.parse(user.unlocked_levels),
-    completedLevels: JSON.parse(user.completed_levels),
-    levelTimes: JSON.parse(user.level_times),
+    unlockedLevels: user.unlocked_levels,
+    completedLevels: user.completed_levels,
+    levelTimes: user.level_times,
     totalTime: user.total_time,
     syncedAt: user.last_active_at
   });
@@ -403,57 +419,63 @@ async function handleProgressPost(req, res, pathname, query) {
     sendError(res, 400, validation.message);
     return;
   }
-  var unlockedLevels = JSON.stringify(body.unlockedLevels);
-  var completedLevels = JSON.stringify(body.completedLevels);
-  var levelTimes = JSON.stringify(body.levelTimes);
-  var totalTime = body.totalTime;
   var now = new Date().toISOString();
+  var today = now.split('T')[0];
+
+  user.unlocked_levels = body.unlockedLevels;
+  user.completed_levels = body.completedLevels;
+  user.level_times = body.levelTimes;
+  if (body.totalTime > 0) {
+    user.total_time = body.totalTime;
+  }
+  user.last_active_at = now;
+
+  var existingDaily = data.dailyScores.find(function(s) {
+    return s.user_id === user.id && s.score_date === today;
+  });
+  if (body.totalTime > 0) {
+    if (!existingDaily) {
+      data.dailyScores.push({
+        user_id: user.id,
+        nickname: user.nickname,
+        total_time: body.totalTime,
+        score_date: today,
+        created_at: now
+      });
+    } else {
+      existingDaily.total_time = body.totalTime;
+      existingDaily.nickname = user.nickname;
+    }
+  }
+
+  saveData();
+
+  var rankResult = calculateRanks(user.id, body.totalTime, today);
+  var newDailyRank = rankResult.dailyRank;
+  var newTotalRank = rankResult.totalRank;
 
   var rankBadges = [];
   var dailyRankImproved = false;
   var totalRankImproved = false;
-  var newDailyRank = 0;
-  var newTotalRank = 0;
-
-  db.prepare(''
-    + 'UPDATE users SET unlocked_levels = ?, completed_levels = ?, level_times = ?, total_time = ?, last_active_at = ?'
-    + ' WHERE id = ?'
-  ).run(unlockedLevels, completedLevels, levelTimes, totalTime, now, user.id);
-
-  var today = now.split('T')[0];
-  var stmtCheckToday = db.prepare('SELECT id FROM daily_scores WHERE user_id = ? AND score_date = ?');
-  var existingToday = stmtCheckToday.get(user.id, today);
-  if (!existingToday) {
-    var stmtInsertDaily = db.prepare('INSERT INTO daily_scores (user_id, nickname, total_time, score_date, created_at) VALUES (?, ?, ?, ?, ?)');
-    stmtInsertDaily.run(user.id, user.nickname, totalTime, today, now);
-  } else {
-    var stmtUpdateDaily = db.prepare('UPDATE daily_scores SET total_time = ?, nickname = ? WHERE user_id = ? AND score_date = ?');
-    stmtUpdateDaily.run(totalTime, user.nickname, user.id, today);
-  }
-
-  var rankResult = calculateRanks(user.id, totalTime, today);
-  newDailyRank = rankResult.dailyRank;
-  newTotalRank = rankResult.totalRank;
 
   if (newDailyRank > 0) {
-    var currentBestDaily = user.best_daily_rank;
-    if (currentBestDaily === 0 || newDailyRank < currentBestDaily) {
-      db.prepare('UPDATE users SET best_daily_rank = ?, daily_rank_updated_date = ? WHERE id = ?')
-        .run(newDailyRank, today, user.id);
+    if (user.best_daily_rank === 0 || newDailyRank < user.best_daily_rank) {
+      user.best_daily_rank = newDailyRank;
+      user.daily_rank_updated_date = today;
       rankBadges.push('best_daily_rank');
       dailyRankImproved = true;
     }
   }
 
   if (newTotalRank > 0) {
-    var currentBestTotal = user.best_total_rank;
-    if (currentBestTotal === 0 || newTotalRank < currentBestTotal) {
-      db.prepare('UPDATE users SET best_total_rank = ? WHERE id = ?')
-        .run(newTotalRank, user.id);
+    if (user.best_total_rank === 0 || newTotalRank < user.best_total_rank) {
+      user.best_total_rank = newTotalRank;
       rankBadges.push('best_total_rank');
       totalRankImproved = true;
     }
   }
+
+  saveData();
 
   log('debug', 'Progress synced for user:', user.id, '| dailyRank:', newDailyRank, 'totalRank:', newTotalRank);
   sendJson(res, 200, {
@@ -473,13 +495,15 @@ function calculateRanks(userId, totalTime, today) {
   var dailyRank = 0;
   var totalRank = 0;
 
-  var stmtDaily = db.prepare('SELECT COUNT(*) + 1 as rank FROM daily_scores WHERE score_date = ? AND total_time < ?');
-  var dailyResult = stmtDaily.get(today, totalTime);
-  dailyRank = dailyResult ? dailyResult.rank : 0;
+  var dailyList = data.dailyScores.filter(function(s) { return s.score_date === today && s.total_time > 0; });
+  dailyList.sort(function(a, b) { return a.total_time - b.total_time; });
+  var dailyIndex = dailyList.findIndex(function(s) { return s.user_id === userId; });
+  dailyRank = dailyIndex >= 0 ? dailyIndex + 1 : 0;
 
-  var stmtTotal = db.prepare('SELECT COUNT(*) + 1 as rank FROM users WHERE total_time > 0 AND total_time < ?');
-  var totalResult = stmtTotal.get(totalTime);
-  totalRank = totalResult ? totalResult.rank : 0;
+  var totalList = data.users.filter(function(u) { return u.total_time > 0; });
+  totalList.sort(function(a, b) { return a.total_time - b.total_time; });
+  var totalIndex = totalList.findIndex(function(u) { return u.id === userId; });
+  totalRank = totalIndex >= 0 ? totalIndex + 1 : 0;
 
   return { dailyRank: dailyRank, totalRank: totalRank };
 }
@@ -489,14 +513,16 @@ function handleRankTotal(req, res, pathname, query) {
   var limit = parseInt(query.limit) || 20;
   var offset = (page - 1) * limit;
 
-  var stmtCount = db.prepare('SELECT COUNT(*) as total FROM users WHERE total_time > 0');
-  var totalResult = stmtCount.get();
-  var total = totalResult ? totalResult.total : 0;
+  var list = data.users.filter(function(u) { return u.total_time > 0; });
+  list.sort(function(a, b) {
+    if (a.total_time !== b.total_time) return a.total_time - b.total_time;
+    return a.last_active_at.localeCompare(b.last_active_at);
+  });
 
-  var stmtList = db.prepare('SELECT id, nickname, total_time FROM users WHERE total_time > 0 ORDER BY total_time ASC, last_active_at ASC LIMIT ? OFFSET ?');
-  var list = stmtList.all(limit, offset);
+  var total = list.length;
+  var paged = list.slice(offset, offset + limit);
 
-  var formattedList = list.map(function(item, index) {
+  var formattedList = paged.map(function(item, index) {
     return {
       rank: offset + index + 1,
       userId: item.id,
@@ -522,14 +548,16 @@ function handleRankDaily(req, res, pathname, query) {
   var offset = (page - 1) * limit;
   var date = query.date || new Date().toISOString().split('T')[0];
 
-  var stmtCount = db.prepare('SELECT COUNT(*) as total FROM daily_scores WHERE score_date = ?');
-  var totalResult = stmtCount.get(date);
-  var total = totalResult ? totalResult.total : 0;
+  var list = data.dailyScores.filter(function(s) { return s.score_date === date; });
+  list.sort(function(a, b) {
+    if (a.total_time !== b.total_time) return a.total_time - b.total_time;
+    return a.created_at.localeCompare(b.created_at);
+  });
 
-  var stmtList = db.prepare('SELECT id, user_id, nickname, total_time FROM daily_scores WHERE score_date = ? ORDER BY total_time ASC, created_at ASC LIMIT ? OFFSET ?');
-  var list = stmtList.all(date, limit, offset);
+  var total = list.length;
+  var paged = list.slice(offset, offset + limit);
 
-  var formattedList = list.map(function(item, index) {
+  var formattedList = paged.map(function(item, index) {
     return {
       rank: offset + index + 1,
       userId: item.user_id,
@@ -555,12 +583,11 @@ function handleRankYesterday(req, res, pathname, query) {
   yesterday.setDate(yesterday.getDate() - 1);
   var yesterdayStr = yesterday.toISOString().split('T')[0];
 
-  var stmtCount = db.prepare('SELECT COUNT(*) as total FROM daily_scores WHERE score_date = ?');
-  var totalResult = stmtCount.get(yesterdayStr);
-  var total = totalResult ? totalResult.total : 0;
-
-  var stmtList = db.prepare('SELECT id, user_id, nickname, total_time FROM daily_scores WHERE score_date = ? ORDER BY total_time ASC, created_at ASC');
-  var list = stmtList.all(yesterdayStr);
+  var list = data.dailyScores.filter(function(s) { return s.score_date === yesterdayStr; });
+  list.sort(function(a, b) {
+    if (a.total_time !== b.total_time) return a.total_time - b.total_time;
+    return a.created_at.localeCompare(b.created_at);
+  });
 
   var formattedList = list.map(function(item, index) {
     return {
@@ -575,9 +602,9 @@ function handleRankYesterday(req, res, pathname, query) {
     code: 0,
     data: {
       list: formattedList,
-      total: total,
+      total: formattedList.length,
       page: 1,
-      limit: total,
+      limit: formattedList.length,
       date: yesterdayStr,
       myRank: 0
     }
@@ -599,19 +626,20 @@ function handleRankMy(req, res, pathname, query) {
   var today = new Date().toISOString().split('T')[0];
   var newRankInfo = calculateRanks(user.id, user.total_time, today);
 
-  var stmtYesterday = db.prepare('SELECT yesterday_daily_rank, yesterday_rank_updated FROM users WHERE id = ?');
-  var yesterdayInfo = stmtYesterday.get(user.id);
-
-  var hasNewRank = false;
-  if (newRankInfo.dailyRank > 0 && user.best_daily_rank > 0) {
-    if (newRankInfo.dailyRank < user.best_daily_rank) {
-      hasNewRank = true;
+  if (newRankInfo.dailyRank > 0) {
+    if (user.best_daily_rank === 0 || newRankInfo.dailyRank < user.best_daily_rank) {
+      user.best_daily_rank = newRankInfo.dailyRank;
+      user.daily_rank_updated_date = today;
     }
   }
-  if (newRankInfo.totalRank > 0 && user.best_total_rank > 0) {
-    if (newRankInfo.totalRank < user.best_total_rank) {
-      hasNewRank = true;
+  if (newRankInfo.totalRank > 0) {
+    if (user.best_total_rank === 0 || newRankInfo.totalRank < user.best_total_rank) {
+      user.best_total_rank = newRankInfo.totalRank;
     }
+  }
+
+  if (newRankInfo.dailyRank > 0 || newRankInfo.totalRank > 0) {
+    saveData();
   }
 
   sendJson(res, 200, {
@@ -621,8 +649,8 @@ function handleRankMy(req, res, pathname, query) {
       totalRank: newRankInfo.totalRank,
       bestDailyRank: user.best_daily_rank,
       bestTotalRank: user.best_total_rank,
-      yesterdayRank: yesterdayInfo ? yesterdayInfo.yesterday_daily_rank : 0,
-      hasNewRank: hasNewRank
+      yesterdayRank: user.yesterday_daily_rank,
+      hasNewRank: false
     }
   });
 }
@@ -656,17 +684,18 @@ async function handleWxCallback(req, res, pathname, query) {
     if (existingUser) {
       var newToken = generateToken();
       var now = new Date().toISOString();
-      db.prepare('UPDATE users SET token = ?, last_active_at = ? WHERE id = ?')
-        .run(newToken, now, existingUser.id);
+      existingUser.token = newToken;
+      existingUser.last_active_at = now;
+      saveData();
       user = {
         id: existingUser.id,
         token: newToken,
         nickname: existingUser.nickname,
         openid: existingUser.openid,
         isAnonymous: !!existingUser.is_anonymous,
-        unlockedLevels: JSON.parse(existingUser.unlocked_levels),
-        completedLevels: JSON.parse(existingUser.completed_levels),
-        levelTimes: JSON.parse(existingUser.level_times),
+        unlockedLevels: existingUser.unlocked_levels,
+        completedLevels: existingUser.completed_levels,
+        levelTimes: existingUser.level_times,
         totalTime: existingUser.total_time
       };
       log('info', 'WeChat user re-authenticated:', openid, user.id);
@@ -790,6 +819,16 @@ var server = http.createServer(async function(req, res) {
   var query = parsedUrl.query;
 
   if (pathname.startsWith('/api/')) {
+    if (req.method === 'OPTIONS') {
+      res.writeHead(200, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Max-Age': '86400'
+      });
+      res.end();
+      return;
+    }
     var handler = router[pathname] && router[pathname][req.method];
     if (handler) {
       await handler(req, res, pathname, query);

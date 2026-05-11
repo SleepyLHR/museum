@@ -7,7 +7,6 @@ var RankPage = (function () {
   var limit = 20;
   var totalList = [];
   var dailyList = [];
-  var yesterdayList = [];
   var myRankInfo = null;
 
   function formatTime(seconds) {
@@ -16,16 +15,9 @@ var RankPage = (function () {
     return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
   }
 
-  function formatDate(dateStr) {
-    if (!dateStr) return '';
-    var d = new Date(dateStr);
-    return d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
-  }
-
   function getRankList(tab) {
     if (tab === 'total') return totalList;
-    if (tab === 'daily') return dailyList;
-    return yesterdayList;
+    return dailyList;
   }
 
   function buildRankItem(item, isMe) {
@@ -44,39 +36,37 @@ var RankPage = (function () {
   }
 
   function buildMyRankCard() {
-    if (!myRankInfo) return '';
+    if (!myRankInfo) {
+      return '<div class="my-rank-card">'
+        + '<div class="my-rank-title">📊 我的排名</div>'
+        + '<div class="my-rank-stats">'
+        + '<div class="my-rank-stat">'
+        + '<div class="stat-label">总榜</div>'
+        + '<div class="stat-value">加载中...</div>'
+        + '</div>'
+        + '<div class="my-rank-stat">'
+        + '<div class="stat-label">日榜</div>'
+        + '<div class="stat-value">加载中...</div>'
+        + '</div>'
+        + '</div>'
+        + '</div>';
+    }
 
-    var bestDaily = myRankInfo.bestDailyRank || '-';
-    var bestTotal = myRankInfo.bestTotalRank || '-';
-    var dailyRank = myRankInfo.dailyRank || '-';
-    var totalRank = myRankInfo.totalRank || '-';
+    var dailyRank = myRankInfo.dailyRank > 0 ? myRankInfo.dailyRank : '暂无';
+    var totalRank = myRankInfo.totalRank > 0 ? myRankInfo.totalRank : '暂无';
 
     return '<div class="my-rank-card">'
       + '<div class="my-rank-title">📊 我的排名</div>'
       + '<div class="my-rank-stats">'
       + '<div class="my-rank-stat">'
       + '<div class="stat-label">总榜</div>'
-      + '<div class="stat-value">第 ' + totalRank + ' 名</div>'
+      + '<div class="stat-value">' + (typeof totalRank === 'number' ? '第 ' + totalRank + ' 名' : totalRank) + '</div>'
       + '</div>'
       + '<div class="my-rank-stat">'
       + '<div class="stat-label">日榜</div>'
-      + '<div class="stat-value">第 ' + dailyRank + ' 名</div>'
+      + '<div class="stat-value">' + (typeof dailyRank === 'number' ? '第 ' + dailyRank + ' 名' : dailyRank) + '</div>'
       + '</div>'
       + '</div>'
-      + '<div class="my-rank-best">'
-      + '<span>🏅 总榜最佳: 第 ' + bestTotal + ' 名</span>'
-      + '<span>📅 日榜最佳: 第 ' + bestDaily + ' 名</span>'
-      + '</div>'
-      + '</div>';
-  }
-
-  function buildYesterdayHeader() {
-    var yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    var dateStr = formatDate(yesterday.toISOString());
-    return '<div class="yesterday-header">'
-      + '<div class="yesterday-title">昨日榜单（' + dateStr + '）</div>'
-      + '<div class="yesterday-desc">最终排名结果已锁定</div>'
       + '</div>';
   }
 
@@ -110,16 +100,10 @@ var RankPage = (function () {
   }
 
   function render() {
-    var yesterdayDate = new Date();
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    var yesterdayStr = formatDate(yesterdayDate.toISOString());
-
     var myCard = buildMyRankCard();
-    var yesterdayHeader = currentTab === 'yesterday' ? buildYesterdayHeader() : '';
     var listHtml = buildRankListHtml(currentTab, getRankList(currentTab), currentTab === 'total' ? totalPage : dailyPage);
 
     var totalActive = currentTab === 'total' ? ' active' : '';
-    var yesterdayActive = currentTab === 'yesterday' ? ' active' : '';
     var dailyActive = currentTab === 'daily' ? ' active' : '';
 
     return '<div class="rank-container">'
@@ -130,11 +114,9 @@ var RankPage = (function () {
       + myCard
       + '<div class="rank-tabs">'
       + '<div class="rank-tab' + totalActive + '" data-tab="total">总榜</div>'
-      + '<div class="rank-tab' + yesterdayActive + '" data-tab="yesterday">昨日</div>'
       + '<div class="rank-tab' + dailyActive + '" data-tab="daily">日榜</div>'
       + '</div>'
       + '<div class="rank-body">'
-      + yesterdayHeader
       + '<div class="rank-list" id="rank-list">' + listHtml + '</div>'
       + '<div class="rank-pagination-area" id="rank-pagination"></div>'
       + '</div>'
@@ -142,56 +124,54 @@ var RankPage = (function () {
   }
 
   function loadMyRank() {
-    App.callApi('/api/rank/my', 'GET', null, function (data) {
-      myRankInfo = data;
-      var myCardEl = document.querySelector('.my-rank-card');
-      if (myCardEl) {
-        myCardEl.outerHTML = buildMyRankCard();
-      }
-    });
+    App.callApi('GET', '/api/rank/my', null)
+      .then(function(data) {
+        if (data && data.data) {
+          myRankInfo = data.data;
+          var myCardEl = document.querySelector('.my-rank-card');
+          if (myCardEl) {
+            myCardEl.outerHTML = buildMyRankCard();
+          }
+        }
+      })
+      .catch(function(err) {
+        console.error('Load my rank failed:', err);
+      });
   }
 
   function loadRankList(tab, page) {
     var api = tab === 'daily' ? '/api/rank/daily' : '/api/rank/total';
     var params = '?page=' + page + '&limit=' + limit;
 
-    App.callApi(api + params, 'GET', null, function (data) {
-      if (tab === 'daily') {
-        dailyList = data.list || [];
-        dailyPage = page;
-      } else {
-        totalList = data.list || [];
-        totalPage = page;
-      }
+    App.callApi('GET', api + params, null)
+      .then(function(data) {
+        if (!data || !data.data) return;
+        data = data.data;
+        if (tab === 'daily') {
+          dailyList = data.list || [];
+          dailyPage = page;
+        } else {
+          totalList = data.list || [];
+          totalPage = page;
+        }
 
-      var listEl = document.getElementById('rank-list');
-      if (listEl) {
-        listEl.innerHTML = buildRankListHtml(tab, getRankList(tab), page);
-      }
+        var listEl = document.getElementById('rank-list');
+        if (listEl) {
+          listEl.innerHTML = buildRankListHtml(tab, getRankList(tab), page);
+        }
 
-      var paginationEl = document.getElementById('rank-pagination');
-      if (paginationEl) {
-        var total = data.total || 0;
-        paginationEl.innerHTML = buildPagination(tab, page, total);
-        bindPagination();
-      }
+        var paginationEl = document.getElementById('rank-pagination');
+        if (paginationEl) {
+          var total = data.total || 0;
+          paginationEl.innerHTML = buildPagination(tab, page, total);
+          bindPagination();
+        }
 
-      App.markRankViewed();
-    });
-  }
-
-  function loadYesterdayRank() {
-    App.callApi('/api/rank/yesterday', 'GET', null, function (data) {
-      yesterdayList = data.list || [];
-      var listEl = document.getElementById('rank-list');
-      if (listEl) {
-        listEl.innerHTML = buildRankListHtml('yesterday', yesterdayList, 1);
-      }
-      var paginationEl = document.getElementById('rank-pagination');
-      if (paginationEl) {
-        paginationEl.innerHTML = '';
-      }
-    });
+        App.markRankViewed();
+      })
+      .catch(function(err) {
+        console.error('Load rank list failed:', err);
+      });
   }
 
   function bindPagination() {
@@ -221,17 +201,17 @@ var RankPage = (function () {
         AudioManager.playClick();
         var tab = this.getAttribute('data-tab');
         currentTab = tab;
-        PageManager.render();
+        document.getElementById('app').innerHTML = render();
 
         if (tab === 'total') loadRankList('total', totalPage);
-        else if (tab === 'daily') loadRankList('daily', dailyPage);
-        else loadYesterdayRank();
+        else loadRankList('daily', dailyPage);
+        
+        mount();
       });
     }
 
     if (currentTab === 'total') loadRankList('total', totalPage);
-    else if (currentTab === 'daily') loadRankList('daily', dailyPage);
-    else loadYesterdayRank();
+    else loadRankList('daily', dailyPage);
 
     loadMyRank();
   }

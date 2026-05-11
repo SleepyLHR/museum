@@ -1,6 +1,8 @@
 var App = (function () {
   'use strict';
 
+  var API_BASE_URL = 'http://127.0.0.1:3002';
+
   var config = null;
   var defaultRelics = [
     {
@@ -275,6 +277,17 @@ var App = (function () {
     }
   }
 
+  var NICKNAME_WORDS = [
+    '快乐', '勇敢', '幸运', '勤劳', '智慧', '热心', '阳光',
+    '好奇', '自由', '温暖', '元气', '灵动', '远方', '追风'
+  ];
+
+  function generateFallbackNickname() {
+    var word = NICKNAME_WORDS[Math.floor(Math.random() * NICKNAME_WORDS.length)];
+    var num = String(Math.floor(Math.random() * 900) + 100);
+    return word + '玩家' + num;
+  }
+
   function getNickname() {
     try {
       var stored = localStorage.getItem('nickname');
@@ -282,7 +295,9 @@ var App = (function () {
         return stored.trim();
       }
     } catch (e) {}
-    return '神秘玩家';
+    var fallback = generateFallbackNickname();
+    try { localStorage.setItem('nickname', fallback); } catch (e) {}
+    return fallback;
   }
 
   function getRelicByLevel(levelId) {
@@ -341,7 +356,7 @@ var App = (function () {
       if (body && (method === 'POST' || method === 'PUT')) {
         options.body = JSON.stringify(body);
       }
-      fetch(path, options)
+      fetch(API_BASE_URL + path, options)
         .then(function(res) {
           if (res.status === 401) {
             clearToken();
