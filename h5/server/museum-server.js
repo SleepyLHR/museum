@@ -287,7 +287,12 @@ async function handleSessionPost(req, res, pathname, query) {
         + '&state=' + state
         + '#wechat_redirect';
       log('info', 'Redirecting to WeChat OAuth:', oauthUrl);
-      res.writeHead(302, { 'Location': oauthUrl });
+      res.writeHead(302, { 
+        'Location': oauthUrl,
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+      });
       res.end();
       return;
     }
@@ -583,6 +588,10 @@ function handleRankYesterday(req, res, pathname, query) {
   yesterday.setDate(yesterday.getDate() - 1);
   var yesterdayStr = yesterday.toISOString().split('T')[0];
 
+  var token = getTokenFromHeader(req);
+  var user = token ? getUserByToken(token) : null;
+  var myRank = user ? user.yesterday_daily_rank || 0 : 0;
+
   var list = data.dailyScores.filter(function(s) { return s.score_date === yesterdayStr; });
   list.sort(function(a, b) {
     if (a.total_time !== b.total_time) return a.total_time - b.total_time;
@@ -606,7 +615,7 @@ function handleRankYesterday(req, res, pathname, query) {
       page: 1,
       limit: formattedList.length,
       date: yesterdayStr,
-      myRank: 0
+      myRank: myRank
     }
   });
 }
@@ -853,8 +862,52 @@ process.on('unhandledRejection', function(reason) {
   log('error', 'Unhandled rejection:', reason);
 });
 
+function saveYesterdayRank() {
+  var yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  var yesterdayStr = yesterday.toISOString().split('T')[0];
+
+  var yesterdayScores = data.dailyScores.filter(function(s) {
+    return s.score_date === yesterdayStr;
+  });
+  yesterdayScores.sort(function(a, b) {
+    if (a.total_time !== b.total_time) return a.total_time - b.total_time;
+    return a.created_at.localeCompare(b.created_at);
+  });
+
+  for (var i = 0; i < yesterdayScores.length; i++) {
+    var score = yesterdayScores[i];
+    var user = data.users.find(function(u) { return u.id === score.user_id; });
+    if (user) {
+      user.yesterday_daily_rank = i + 1;
+      user.yesterday_rank_updated = new Date().toISOString();
+    }
+  }
+
+  saveData();
+  log('info', 'Yesterday rank saved for date:', yesterdayStr, '| users:', yesterdayScores.length);
+}
+
+function scheduleDailyTask() {
+  var now = new Date();
+  var tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  var delay = tomorrow.getTime() - now.getTime();
+
+  setTimeout(function executeDailyTask() {
+    saveYesterdayRank();
+
+    var nextDelay = 24 * 60 * 60 * 1000;
+    setInterval(function() {
+      saveYesterdayRank();
+    }, nextDelay);
+  }, delay);
+
+  log('info', 'Daily rank save task scheduled, first run at:', tomorrow.toLocaleString());
+}
+
 function start() {
   initDatabase();
+  scheduleDailyTask();
   server.listen(config.server.port, config.server.host, function() {
     log('info', 'Museum server started on', config.server.host + ':' + config.server.port);
     log('info', 'WeChat auth:', config.wx.enabled ? 'enabled' : 'disabled');
