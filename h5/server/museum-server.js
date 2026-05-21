@@ -8,17 +8,19 @@ var crypto = require('crypto');
 var config = require('./config');
 
 var dataPath = path.resolve(__dirname, 'data', 'data.json');
-var data = { users: [], dailyScores: [] };
+var data = { users: [], dailyScores: [], totalRanks: [], dailyRankSnapshots: [] };
 
 function loadData() {
   try {
     if (fs.existsSync(dataPath)) {
       var raw = fs.readFileSync(dataPath, 'utf8');
       data = JSON.parse(raw);
+      if (!data.totalRanks) data.totalRanks = [];
+      if (!data.dailyRankSnapshots) data.dailyRankSnapshots = [];
     }
   } catch (e) {
     console.error('Load data error:', e.message);
-    data = { users: [], dailyScores: [] };
+    data = { users: [], dailyScores: [], totalRanks: [], dailyRankSnapshots: [] };
   }
 }
 
@@ -52,7 +54,7 @@ function log(level) {
 function initDatabase() {
   loadData();
   log('info', 'Database loaded:', dataPath);
-  log('info', 'Users:', data.users.length, '| Daily scores:', data.dailyScores.length);
+  log('info', 'Users:', data.users.length, '| Daily scores:', data.dailyScores.length, '| Total ranks:', data.totalRanks.length, '| Rank snapshots:', data.dailyRankSnapshots.length);
 }
 
 function generateToken() {
@@ -239,7 +241,8 @@ var router = {
   '/api/rank/total': { GET: handleRankTotal },
   '/api/rank/daily': { GET: handleRankDaily },
   '/api/rank/yesterday': { GET: handleRankYesterday },
-  '/api/rank/my': { GET: handleRankMy }
+  '/api/rank/my': { GET: handleRankMy },
+  '/api/admin/clear-data': { POST: handleAdminClearData }
 };
 
 async function handleSessionPost(req, res, pathname, query) {
@@ -427,10 +430,12 @@ async function handleProgressPost(req, res, pathname, query) {
   var now = new Date().toISOString();
   var today = now.split('T')[0];
 
+  var hasAllLevels = body.completedLevels && body.completedLevels.length >= 5;
+
   user.unlocked_levels = body.unlockedLevels;
   user.completed_levels = body.completedLevels;
   user.level_times = body.levelTimes;
-  if (body.totalTime > 0) {
+  if (body.totalTime > 0 && hasAllLevels) {
     user.total_time = body.totalTime;
   }
   user.last_active_at = now;
@@ -438,7 +443,7 @@ async function handleProgressPost(req, res, pathname, query) {
   var existingDaily = data.dailyScores.find(function(s) {
     return s.user_id === user.id && s.score_date === today;
   });
-  if (body.totalTime > 0) {
+  if (body.totalTime > 0 && hasAllLevels) {
     if (!existingDaily) {
       data.dailyScores.push({
         user_id: user.id,
@@ -451,6 +456,7 @@ async function handleProgressPost(req, res, pathname, query) {
       existingDaily.total_time = body.totalTime;
       existingDaily.nickname = user.nickname;
     }
+    rebuildTotalRanks();
   }
 
   saveData();
@@ -505,12 +511,69 @@ function calculateRanks(userId, totalTime, today) {
   var dailyIndex = dailyList.findIndex(function(s) { return s.user_id === userId; });
   dailyRank = dailyIndex >= 0 ? dailyIndex + 1 : 0;
 
-  var totalList = data.users.filter(function(u) { return u.total_time > 0; });
-  totalList.sort(function(a, b) { return a.total_time - b.total_time; });
-  var totalIndex = totalList.findIndex(function(u) { return u.id === userId; });
+  var totalIndex = data.totalRanks.findIndex(function(r) { return r.user_id === userId; });
   totalRank = totalIndex >= 0 ? totalIndex + 1 : 0;
 
   return { dailyRank: dailyRank, totalRank: totalRank };
+}
+
+function rebuildTotalRanks() {
+  var list = data.users.filter(function(u) { return u.total_time > 0; });
+  list.sort(function(a, b) {
+    if (a.total_time !== b.total_time) return a.total_time - b.total_time;
+    return a.last_active_at.localeCompare(b.last_active_at);
+  });
+
+  data.totalRanks = list.map(function(u, index) {
+    return {
+      user_id: u.id,
+      nickname: u.nickname,
+      total_time: u.total_time,
+      rank: index + 1
+    };
+  });
+}
+
+function snapshotDailyRank() {
+  var yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  var yesterdayStr = yesterday.toISOString().split('T')[0];
+
+  var scores = data.dailyScores.filter(function(s) {
+    return s.score_date === yesterdayStr && s.total_time > 0;
+  });
+  scores.sort(function(a, b) {
+    if (a.total_time !== b.total_time) return a.total_time - b.total_time;
+    return a.created_at.localeCompare(b.created_at);
+  });
+
+  if (scores.length === 0) {
+    log('info', 'No daily scores to snapshot for date:', yesterdayStr);
+    return;
+  }
+
+  var snapshot = {
+    date: yesterdayStr,
+    rankings: scores.map(function(item, index) {
+      return {
+        rank: index + 1,
+        user_id: item.user_id,
+        nickname: item.nickname,
+        total_time: item.total_time
+      };
+    }),
+    snapshot_at: new Date().toISOString()
+  };
+
+  var existingIndex = data.dailyRankSnapshots.findIndex(function(s) { return s.date === yesterdayStr; });
+  if (existingIndex >= 0) {
+    data.dailyRankSnapshots[existingIndex] = snapshot;
+  } else {
+    data.dailyRankSnapshots.push(snapshot);
+  }
+
+  saveData();
+  log('info', 'Daily rank snapshot saved for date:', yesterdayStr, '| entries:', scores.length);
 }
 
 function handleRankTotal(req, res, pathname, query) {
@@ -518,19 +581,13 @@ function handleRankTotal(req, res, pathname, query) {
   var limit = parseInt(query.limit) || 20;
   var offset = (page - 1) * limit;
 
-  var list = data.users.filter(function(u) { return u.total_time > 0; });
-  list.sort(function(a, b) {
-    if (a.total_time !== b.total_time) return a.total_time - b.total_time;
-    return a.last_active_at.localeCompare(b.last_active_at);
-  });
+  var total = data.totalRanks.length;
+  var paged = data.totalRanks.slice(offset, offset + limit);
 
-  var total = list.length;
-  var paged = list.slice(offset, offset + limit);
-
-  var formattedList = paged.map(function(item, index) {
+  var formattedList = paged.map(function(item) {
     return {
-      rank: offset + index + 1,
-      userId: item.id,
+      rank: item.rank,
+      userId: item.user_id,
       nickname: item.nickname,
       totalTime: item.total_time
     };
@@ -590,17 +647,26 @@ function handleRankYesterday(req, res, pathname, query) {
 
   var token = getTokenFromHeader(req);
   var user = token ? getUserByToken(token) : null;
-  var myRank = user ? user.yesterday_daily_rank || 0 : 0;
 
-  var list = data.dailyScores.filter(function(s) { return s.score_date === yesterdayStr; });
-  list.sort(function(a, b) {
-    if (a.total_time !== b.total_time) return a.total_time - b.total_time;
-    return a.created_at.localeCompare(b.created_at);
-  });
+  var snapshot = data.dailyRankSnapshots.find(function(s) { return s.date === yesterdayStr; });
 
-  var formattedList = list.map(function(item, index) {
+  if (!snapshot) {
+    sendJson(res, 200, {
+      code: 0,
+      data: { list: [], total: 0, page: 1, limit: 0, date: yesterdayStr, snapshotExists: false }
+    });
+    return;
+  }
+
+  var myRank = 0;
+  if (user) {
+    var myEntry = snapshot.rankings.find(function(r) { return r.user_id === user.id; });
+    myRank = myEntry ? myEntry.rank : 0;
+  }
+
+  var formattedList = snapshot.rankings.map(function(item) {
     return {
-      rank: index + 1,
+      rank: item.rank,
       userId: item.user_id,
       nickname: item.nickname,
       totalTime: item.total_time
@@ -615,7 +681,8 @@ function handleRankYesterday(req, res, pathname, query) {
       page: 1,
       limit: formattedList.length,
       date: yesterdayStr,
-      myRank: myRank
+      myRank: myRank,
+      snapshotExists: true
     }
   });
 }
@@ -662,6 +729,26 @@ function handleRankMy(req, res, pathname, query) {
       hasNewRank: false
     }
   });
+}
+
+function handleAdminClearData(req, res, pathname, query) {
+  var ip = req.socket.remoteAddress || '';
+  var isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === 'localhost';
+
+  if (!isLocal) {
+    log('warn', 'Admin clear-data rejected from remote IP:', ip);
+    sendError(res, 403, 'Forbidden: only localhost can clear data');
+    return;
+  }
+
+  data.users = [];
+  data.dailyScores = [];
+  data.totalRanks = [];
+  data.dailyRankSnapshots = [];
+  saveData();
+
+  log('info', 'All data cleared via admin API');
+  sendJson(res, 200, { success: true, message: 'All data cleared' });
 }
 
 async function handleWxCallback(req, res, pathname, query) {
@@ -862,51 +949,30 @@ process.on('unhandledRejection', function(reason) {
   log('error', 'Unhandled rejection:', reason);
 });
 
-function saveYesterdayRank() {
-  var yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  var yesterdayStr = yesterday.toISOString().split('T')[0];
-
-  var yesterdayScores = data.dailyScores.filter(function(s) {
-    return s.score_date === yesterdayStr;
-  });
-  yesterdayScores.sort(function(a, b) {
-    if (a.total_time !== b.total_time) return a.total_time - b.total_time;
-    return a.created_at.localeCompare(b.created_at);
-  });
-
-  for (var i = 0; i < yesterdayScores.length; i++) {
-    var score = yesterdayScores[i];
-    var user = data.users.find(function(u) { return u.id === score.user_id; });
-    if (user) {
-      user.yesterday_daily_rank = i + 1;
-      user.yesterday_rank_updated = new Date().toISOString();
-    }
-  }
-
-  saveData();
-  log('info', 'Yesterday rank saved for date:', yesterdayStr, '| users:', yesterdayScores.length);
-}
-
 function scheduleDailyTask() {
   var now = new Date();
   var tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   var delay = tomorrow.getTime() - now.getTime();
 
   setTimeout(function executeDailyTask() {
-    saveYesterdayRank();
+    snapshotDailyRank();
 
     var nextDelay = 24 * 60 * 60 * 1000;
     setInterval(function() {
-      saveYesterdayRank();
+      snapshotDailyRank();
     }, nextDelay);
   }, delay);
 
-  log('info', 'Daily rank save task scheduled, first run at:', tomorrow.toLocaleString());
+  log('info', 'Daily rank snapshot task scheduled, first run at:', tomorrow.toLocaleString());
 }
 
 function start() {
   initDatabase();
+  if (data.totalRanks.length === 0) {
+    rebuildTotalRanks();
+    saveData();
+    log('info', 'Initial totalRanks rebuild complete, entries:', data.totalRanks.length);
+  }
   scheduleDailyTask();
   server.listen(config.server.port, config.server.host, function() {
     log('info', 'Museum server started on', config.server.host + ':' + config.server.port);
