@@ -8,6 +8,7 @@ var RankPage = (function () {
   var totalList = [];
   var dailyList = [];
   var myRankInfo = null;
+  var loadVersion = 0;
 
   function formatTime(seconds) {
     var mins = Math.floor(seconds / 60);
@@ -124,8 +125,11 @@ var RankPage = (function () {
   }
 
   function loadMyRank() {
+    loadVersion++;
+    var requestVersion = loadVersion;
     App.callApi('GET', '/api/rank/my', null)
       .then(function(data) {
+        if (requestVersion !== loadVersion) return;
         if (data && data.data) {
           myRankInfo = data.data;
           var myCardEl = document.querySelector('.my-rank-card');
@@ -140,11 +144,14 @@ var RankPage = (function () {
   }
 
   function loadRankList(tab, page) {
+    loadVersion++;
+    var requestVersion = loadVersion;
     var api = tab === 'daily' ? '/api/rank/daily' : '/api/rank/total';
     var params = '?page=' + page + '&limit=' + limit;
 
     App.callApi('GET', api + params, null)
       .then(function(data) {
+        if (requestVersion !== loadVersion) return;
         if (!data || !data.data) return;
         data = data.data;
         if (tab === 'daily') {
@@ -190,6 +197,7 @@ var RankPage = (function () {
   }
 
   function mount() {
+    loadVersion = 0;
     document.getElementById('btn-back-rank').addEventListener('click', function () {
       AudioManager.playClick();
       Router.navigate('home');

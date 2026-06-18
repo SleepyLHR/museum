@@ -133,7 +133,6 @@ var AudioManager = (function () {
 
   function setVolume(volume) {
     bgmVolume = Math.max(0, Math.min(1, volume));
-    sfxVolume = bgmVolume;
     if (bgmAudio) {
       bgmAudio.volume = bgmVolume;
     }

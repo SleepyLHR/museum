@@ -129,10 +129,7 @@ var App = (function () {
   function setLevelTime(levelId, seconds) {
     if (!levelTimes[levelId] || seconds < levelTimes[levelId]) {
       levelTimes[levelId] = seconds;
-    }
-    saveLevelTimes();
-    if (serverAvailable) {
-      syncProgress();
+      saveLevelTimes();
     }
   }
 
@@ -382,13 +379,18 @@ var App = (function () {
     var urlParams = (function() {
       try {
         var search = location.search;
-        if (!search) return {};
-        var params = {};
-        search.slice(1).split('&').forEach(function(pair) {
-          var parts = pair.split('=');
-          params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1] || '');
-        });
-        return params;
+      if (!search) {
+        var hash = location.hash;
+        var qi = hash.indexOf('?');
+        if (qi >= 0) search = hash.substring(qi);
+      }
+      if (!search) return {};
+      var params = {};
+      search.slice(1).split('&').forEach(function(pair) {
+        var parts = pair.split('=');
+        params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1] || '');
+      });
+      return params;
       } catch (e) { return {}; }
     })();
 
@@ -396,7 +398,10 @@ var App = (function () {
     if (tokenFromUrl) {
       saveToken(tokenFromUrl, '');
       if (history.replaceState) {
-        history.replaceState({}, '', location.pathname + location.hash);
+        var hash = location.hash;
+        var qi = hash.indexOf('?');
+        if (qi >= 0) hash = hash.substring(0, qi);
+        history.replaceState({}, '', location.pathname + hash);
       }
     }
 

@@ -84,11 +84,13 @@ var GamePage = (function () {
 
   function buildPieceStyle(piece) {
     var imgUrl = relic.image || '';
+    var bgSizeX = Math.max(gridCols, 2) * 100;
+    var bgSizeY = Math.max(gridRows, 2) * 100;
+    var bgX = gridCols > 1 ? (piece.col * 100 / (gridCols - 1)) + '%' : '0%';
+    var bgY = gridRows > 1 ? (piece.row * 100 / (gridRows - 1)) + '%' : '0%';
     return 'background-image: url(\'' + imgUrl + '\');'
-      + ' background-size: ' + (gridCols * 100) + '% ' + (gridRows * 100) + '%;'
-      + ' background-position: '
-      + (gridCols > 1 ? (piece.col * 100 / (gridCols - 1)) + '%' : '0%') + ' '
-      + (gridRows > 1 ? (piece.row * 100 / (gridRows - 1)) + '%' : '0%') + ';';
+      + ' background-size: ' + bgSizeX + '% ' + bgSizeY + '%;'
+      + ' background-position: ' + bgX + ' ' + bgY + ';';
   }
 
   function buildHtml() {
@@ -166,7 +168,7 @@ var GamePage = (function () {
       cell.className = 'puzzle-cell';
       cell.setAttribute('data-piece-id', piece.id);
       cell.style.backgroundImage = 'url(\'' + (relic.image || '') + '\')';
-      cell.style.backgroundSize = (gridCols * 100) + '% ' + (gridRows * 100) + '%';
+      cell.style.backgroundSize = (Math.max(gridCols, 2) * 100) + '% ' + (Math.max(gridRows, 2) * 100) + '%';
       cell.style.backgroundPosition = (gridCols > 1 ? (piece.col * 100 / (gridCols - 1)) + '%' : '0%') + ' '
         + (gridRows > 1 ? (piece.row * 100 / (gridRows - 1)) + '%' : '0%');
       cell.addEventListener('click', selectPieceHandler);

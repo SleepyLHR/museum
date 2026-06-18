@@ -169,7 +169,10 @@ var CertificatePage = (function () {
     }
   }
 
-  function unmount() {}
+  function unmount() {
+    var imgOverlay = document.getElementById('cert-image-overlay');
+    if (imgOverlay) imgOverlay.remove();
+  }
 
   return {
     render: render,

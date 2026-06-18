@@ -231,6 +231,11 @@ function getClientIp(req) {
   return req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
 }
 
+function getLocalDate(date) {
+  var d = date || new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 var router = {
   '/api/user/session': { GET: handleSessionGet, POST: handleSessionPost },
   '/api/user/info': { GET: handleUserInfo },
@@ -428,7 +433,7 @@ async function handleProgressPost(req, res, pathname, query) {
     return;
   }
   var now = new Date().toISOString();
-  var today = now.split('T')[0];
+  var today = getLocalDate();
 
   var hasAllLevels = body.completedLevels && body.completedLevels.length >= 5;
 
@@ -456,9 +461,9 @@ async function handleProgressPost(req, res, pathname, query) {
       existingDaily.total_time = body.totalTime;
       existingDaily.nickname = user.nickname;
     }
-    rebuildTotalRanks();
   }
 
+  rebuildTotalRanks();
   saveData();
 
   var rankResult = calculateRanks(user.id, body.totalTime, today);
@@ -537,7 +542,7 @@ function rebuildTotalRanks() {
 function snapshotDailyRank() {
   var yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  var yesterdayStr = yesterday.toISOString().split('T')[0];
+  var yesterdayStr = getLocalDate(yesterday);
 
   var scores = data.dailyScores.filter(function(s) {
     return s.score_date === yesterdayStr && s.total_time > 0;
@@ -608,7 +613,7 @@ function handleRankDaily(req, res, pathname, query) {
   var page = parseInt(query.page) || 1;
   var limit = parseInt(query.limit) || 20;
   var offset = (page - 1) * limit;
-  var date = query.date || new Date().toISOString().split('T')[0];
+  var date = query.date || getLocalDate();
 
   var list = data.dailyScores.filter(function(s) { return s.score_date === date; });
   list.sort(function(a, b) {
@@ -643,7 +648,7 @@ function handleRankDaily(req, res, pathname, query) {
 function handleRankYesterday(req, res, pathname, query) {
   var yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  var yesterdayStr = yesterday.toISOString().split('T')[0];
+  var yesterdayStr = getLocalDate(yesterday);
 
   var token = getTokenFromHeader(req);
   var user = token ? getUserByToken(token) : null;
@@ -699,7 +704,7 @@ function handleRankMy(req, res, pathname, query) {
     return;
   }
 
-  var today = new Date().toISOString().split('T')[0];
+  var today = getLocalDate();
   var newRankInfo = calculateRanks(user.id, user.total_time, today);
 
   if (newRankInfo.dailyRank > 0) {
@@ -732,8 +737,10 @@ function handleRankMy(req, res, pathname, query) {
 }
 
 function handleAdminClearData(req, res, pathname, query) {
-  var ip = req.socket.remoteAddress || '';
-  var isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === 'localhost';
+  var ip = getClientIp(req);
+  var remoteIp = req.socket.remoteAddress || '';
+  var isLocal = (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1' || ip === 'localhost') &&
+                (remoteIp === '127.0.0.1' || remoteIp === '::1' || remoteIp === '::ffff:127.0.0.1' || remoteIp === 'localhost');
 
   if (!isLocal) {
     log('warn', 'Admin clear-data rejected from remote IP:', ip);
@@ -761,7 +768,7 @@ async function handleWxCallback(req, res, pathname, query) {
   var error = query.error;
   if (error) {
     log('warn', 'WeChat OAuth error:', error);
-    res.writeHead(302, { 'Location': config.wx.redirectAfterOAuth + '?error=' + error });
+    res.writeHead(302, { 'Location': config.wx.redirectAfterOAuth.replace(/\/?#\/?$/, '') + '?error=' + error + '#/' });
     res.end();
     return;
   }
@@ -799,12 +806,12 @@ async function handleWxCallback(req, res, pathname, query) {
       user = createUser(openid, false);
       log('info', 'New WeChat user created:', openid, user.id);
     }
-    var redirectUrl = config.wx.redirectAfterOAuth + '?token=' + user.token;
+    var redirectUrl = config.wx.redirectAfterOAuth.replace(/\/?#\/?$/, '') + '?token=' + user.token + '#/';
     res.writeHead(302, { 'Location': redirectUrl });
     res.end();
   } catch (err) {
     log('error', 'WeChat OAuth failed:', err.message);
-    res.writeHead(302, { 'Location': config.wx.redirectAfterOAuth + '?error=wx_auth_failed' });
+    res.writeHead(302, { 'Location': config.wx.redirectAfterOAuth.replace(/\/?#\/?$/, '') + '?error=wx_auth_failed' + '#/' });
     res.end();
   }
 }
